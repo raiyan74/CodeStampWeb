@@ -308,8 +308,102 @@ function drawPreviewCanvas(baseImage) {
     if (userText && selectedPosition) {
         // Pass currentFontSize as the font size for barcode value text.
         // Also pass STAMP_CORNER_RADIUS for the rounded background.
-        drawElement(ctx, userText, selectedPosition, previewCanvas.width, previewCanvas.height, currentFontSize, currentTextPadding, isBarcodeEnabled, currentBarcodeWidthPercentage, previewCanvas.width, currentFontSize, STAMP_CORNER_RADIUS);
+        drawElement(ctx, userText, selectedPosition, previewCanvas.width, previewCanvas.height, currentFontSize, currentTextPadding, isBarcodeEnabled, currentBarcodeWidthPercentage, previewCanvas.width, STAMP_CORNER_RADIUS);
     }
+}
+
+// --- MODULAR DRAW FUNCTIONS START ---
+
+/**
+ * NEW: Generates a barcode or measures text to get content dimensions.
+ * @param {CanvasRenderingContext2D} ctx - The canvas 2D rendering context (for text measurement).
+ * @param {string} data - The text or barcode data.
+ * @param {boolean} shouldDrawBarcode - True to generate a barcode, false to measure text.
+ * @param {number} textFontSize - The font size for text or barcode value.
+ * @param {number} barcodeTargetWidthPercent - Percentage of the baseImageActualWidth for the barcode.
+ * @param {number} baseImageActualWidth - The actual width of the source image (for barcode percentage calculation).
+ * @returns {object} An object with { actualContentWidth, actualContentHeight, contentElement (barcode canvas or null), error, errorMsg }
+ */
+function getContentDetails(ctx, data, shouldDrawBarcode, textFontSize, barcodeTargetWidthPercent, baseImageActualWidth) {
+    let actualContentWidth, actualContentHeight;
+    let contentElement = null; // Will hold the barcode canvas if applicable
+    let error = false;
+    let errorMsg = "";
+
+    if (shouldDrawBarcode) {
+        let targetPercentage = barcodeTargetWidthPercent;
+        if (targetPercentage <= 0) targetPercentage = 5; // Default to 5% if 0 or less
+        else if (targetPercentage < 5) targetPercentage = 5; // Min 5%
+
+        const targetBarcodePixelWidth = baseImageActualWidth * (targetPercentage / 100);
+        const tempBarcodeCanvas = document.createElement('canvas');
+        try {
+            JsBarcode(tempBarcodeCanvas, data, {
+                format: "CODE128",
+                lineColor: "#000000",
+                width: 2, // Nominal bar width
+                height: 50, // Nominal bar height
+                displayValue: true,
+                fontSize: textFontSize,
+                margin: 5
+            });
+            if (tempBarcodeCanvas.width === 0) throw new Error("JsBarcode rendered zero-width canvas.");
+
+            const sourceBarcodeWidth = tempBarcodeCanvas.width;
+            const sourceBarcodeHeight = tempBarcodeCanvas.height;
+            const scaleFactor = targetBarcodePixelWidth / sourceBarcodeWidth;
+            
+            actualContentWidth = targetBarcodePixelWidth;
+            actualContentHeight = sourceBarcodeHeight * scaleFactor;
+            contentElement = tempBarcodeCanvas; // Store the generated barcode canvas
+
+            if (actualContentWidth < 10) actualContentWidth = 10;
+            if (actualContentHeight < 10) actualContentHeight = 10;
+        } catch (e) {
+            console.error("Barcode generation error in getContentDetails:", e.message, "Data:", data);
+            error = true;
+            errorMsg = "Barcode Error";
+            // Provide fallback dimensions for the error message itself
+            ctx.font = `bold 16px Arial`; // Use a fixed font for error message measurement
+            actualContentWidth = ctx.measureText(errorMsg).width;
+            actualContentHeight = 16; // Approximate height for 16px text
+        }
+    } else { // Plain text
+        ctx.font = `bold ${textFontSize}px Arial`;
+        const textMetrics = ctx.measureText(data);
+        actualContentWidth = textMetrics.width;
+        actualContentHeight = textFontSize;
+    }
+    return { actualContentWidth, actualContentHeight, contentElement, error, errorMsg };
+}
+
+/**
+ * NEW: Calculates the X and Y coordinates for the stamp element.
+ * @param {string} position - The selected position (e.g., 'top-left').
+ * @param {number} imageDisplayWidth - The width of the canvas.
+ * @param {number} imageDisplayHeight - The height of the canvas.
+ * @param {number} stampWidth - The total width of the stamp (content + padding).
+ * @param {number} stampHeight - The total height of the stamp (content + padding).
+ * @param {number} marginX - The horizontal margin from the canvas edge.
+ * @param {number} marginY - The vertical margin from the canvas edge.
+ * @returns {object} An object with { elementX, elementY }.
+ */
+function calculateStampCoordinates(position, imageDisplayWidth, imageDisplayHeight, stampWidth, stampHeight, marginX, marginY) {
+    let elementX, elementY;
+
+    if (position.includes('left')) elementX = marginX;
+    else if (position.includes('right')) elementX = imageDisplayWidth - stampWidth - marginX;
+    else elementX = (imageDisplayWidth - stampWidth) / 2; // Center X
+
+    if (position.includes('top')) elementY = marginY;
+    else if (position.includes('bottom')) elementY = imageDisplayHeight - stampHeight - marginY;
+    else elementY = (imageDisplayHeight - stampHeight) / 2; // Center Y
+    
+    if (position === 'center') { // Explicit center overrides
+        elementX = (imageDisplayWidth - stampWidth) / 2;
+        elementY = (imageDisplayHeight - stampHeight) / 2;
+    }
+    return { elementX, elementY };
 }
 
 /**
@@ -337,10 +431,67 @@ function roundRect(ctx, x, y, width, height, radius) {
   ctx.closePath(); // Close the path, connecting the last point to the first
 }
 
+/**
+ * NEW: Draws the background for the stamp.
+ * @param {CanvasRenderingContext2D} ctx - The canvas 2D rendering context.
+ * @param {number} x - The top-left x-coordinate of the stamp background.
+ * @param {number} y - The top-left y-coordinate of the stamp background.
+ * @param {number} width - The width of the stamp background.
+ * @param {number} height - The height of the stamp background.
+ * @param {number} cornerRadius - The corner radius for the background.
+ * @param {string} fillStyle - The fill style for the background.
+ * @param {string} strokeStyle - The stroke style for the background border.
+ * @param {number} lineWidth - The line width for the background border.
+ */
+function drawStampBackground(ctx, x, y, width, height, cornerRadius, fillStyle, strokeStyle, lineWidth) {
+    ctx.fillStyle = fillStyle;
+    ctx.strokeStyle = strokeStyle;
+    ctx.lineWidth = lineWidth;
+
+    roundRect(ctx, x, y, width, height, cornerRadius); // Create the rounded path
+    ctx.fill();   // Fill the path
+    ctx.stroke(); // Stroke the path (draw the border)
+}
 
 /**
- * Draws either a text stamp or a barcode onto the provided canvas context.
- * This includes calculating dimensions, position, and drawing the background and content.
+ * NEW: Draws the actual content (text or barcode) onto the stamp.
+ * @param {CanvasRenderingContext2D} ctx - The canvas 2D rendering context.
+ * @param {string} data - The text data (used if not drawing a barcode from contentElement).
+ * @param {boolean} shouldDrawBarcode - True if drawing a barcode.
+ * @param {HTMLCanvasElement | null} barcodeElement - The pre-rendered barcode canvas, or null for text.
+ * @param {number} drawX - The x-coordinate to start drawing the content.
+ * @param {number} drawY - The y-coordinate to start drawing the content.
+ * @param {number} contentWidth - The width of the content to draw.
+ * @param {number} contentHeight - The height of the content to draw.
+ * @param {number} textFontSize - Font size for text.
+ * @param {number} stampElementX - The X coordinate of the overall stamp background (for text centering).
+ * @param {number} stampElementWidth - The width of the overall stamp background (for text centering).
+ * @param {number} stampElementY - The Y coordinate of the overall stamp background (for text centering).
+ * @param {number} stampElementHeight - The height of the overall stamp background (for text centering).
+ */
+function drawStampContent(ctx, data, shouldDrawBarcode, barcodeElement, drawX, drawY, contentWidth, contentHeight, textFontSize, stampElementX, stampElementWidth, stampElementY, stampElementHeight) {
+    if (shouldDrawBarcode && barcodeElement) {
+        if (barcodeElement.width > 0 && barcodeElement.height > 0) {
+            ctx.drawImage(barcodeElement, drawX, drawY, contentWidth, contentHeight);
+        }
+    } else if (!shouldDrawBarcode) { // Plain text
+        ctx.fillStyle = '#000000'; // Black text color
+        ctx.font = `bold ${textFontSize}px Arial`; // Ensure font is set for drawing
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        // Calculate center for text fill based on the padded element box
+        const textDrawCenterX = stampElementX + stampElementWidth / 2;
+        const textDrawCenterY = stampElementY + stampElementHeight / 2;
+        ctx.fillText(data, textDrawCenterX, textDrawCenterY);
+    }
+}
+
+// --- MODULAR DRAW FUNCTIONS END ---
+
+
+/**
+ * REFACTORED: Draws either a text stamp or a barcode onto the provided canvas context.
+ * This function now orchestrates calls to modular helper functions.
  * @param {CanvasRenderingContext2D} ctx - The canvas 2D rendering context.
  * @param {string} data - The text or barcode data.
  * @param {string} position - The selected position (e.g., 'top-left').
@@ -348,155 +499,57 @@ function roundRect(ctx, x, y, width, height, radius) {
  * @param {number} imageDisplayHeight - The height of the canvas area where the image is currently displayed.
  * @param {number} mainTextFontSize - The font size (used for text mode, AND NOW for barcode value).
  * @param {number} padding - The padding around the element (text or barcode).
- * @param {boolean} drawBarcode - True to draw a barcode, false to draw text.
+ * @param {boolean} drawBarcodeFlag - True to draw a barcode, false to draw text. (Renamed from drawBarcode to avoid conflict)
  * @param {number} barcodeWidthPercent - Percentage of the imageDisplayWidth for the barcode.
  * @param {number} baseImageActualWidth - The actual width of the source image (for barcode percentage calculation).
- * @param {number} barcodeValFontSize - Font size for the text under the barcode (effectively `mainTextFontSize`).
  * @param {number} cornerRadius - The radius for the stamp's rounded corners.
  */
-function drawElement(ctx, data, position, imageDisplayWidth, imageDisplayHeight, mainTextFontSize, padding, drawBarcode, barcodeWidthPercent, baseImageActualWidth, barcodeValFontSize, cornerRadius) {
+function drawElement(ctx, data, position, imageDisplayWidth, imageDisplayHeight, mainTextFontSize, padding, drawBarcodeFlag, barcodeWidthPercent, baseImageActualWidth, cornerRadius) {
     // Define margins from the edge of the image/canvas
-    const marginX = Math.max(10, imageDisplayWidth * 0.02); // Min 10px or 2% of width
-    const marginY = Math.max(10, imageDisplayHeight * 0.02); // Min 10px or 2% of height
+    const marginX = Math.max(10, imageDisplayWidth * 0.02);
+    const marginY = Math.max(10, imageDisplayHeight * 0.02);
+
+    // 1. Get Content Details (dimensions, barcode canvas if applicable, errors)
+    const contentDetails = getContentDetails(ctx, data, drawBarcodeFlag, mainTextFontSize, barcodeWidthPercent, baseImageActualWidth);
     
-    let elementX, elementY, elementWidth, elementHeight; // Variables for the stamp's bounding box
-    let actualContentWidth, actualContentHeight; // Variables for the actual text/barcode content size
+    let { actualContentWidth, actualContentHeight, contentElement, error, errorMsg } = contentDetails;
 
-    if (drawBarcode) { // If drawing a barcode
-        let targetPercentage = barcodeWidthPercent;
-        // Ensure a minimum width for the barcode if enabled and percentage is too low or zero
-        if (targetPercentage <= 0 && isBarcodeEnabled) targetPercentage = 5; // Default to 5% if 0 or less
-        else if (targetPercentage < 5 && isBarcodeEnabled) targetPercentage = 5; // Minimum 5%
-
-        // Calculate the target pixel width for the barcode based on the original image width
-        const targetBarcodePixelWidth = baseImageActualWidth * (targetPercentage / 100);
-        const tempBarcodeCanvas = document.createElement('canvas'); // Create a temporary canvas for JsBarcode
-        try {
-            // Generate barcode on the temporary canvas to measure it
-            JsBarcode(tempBarcodeCanvas, data, {
-                format: "CODE128", // Barcode format
-                lineColor: "#000000", // Color of the barcode lines
-                width: 2, // Nominal bar width (JsBarcode scales this)
-                height: 50, // Nominal bar height (JsBarcode scales this)
-                displayValue: true, // Show the text value below the barcode
-                fontSize: mainTextFontSize, // Use the consolidated font size
-                margin: 5 // Internal margin for the barcode
-            });
-            if (tempBarcodeCanvas.width === 0) throw new Error("JsBarcode rendered zero-width canvas."); // Error check
-
-            // Get dimensions from the generated barcode on the temporary canvas
-            const sourceBarcodeWidth = tempBarcodeCanvas.width;
-            const sourceBarcodeHeight = tempBarcodeCanvas.height;
-            // Calculate scaling factor to fit the target pixel width
-            const scaleFactor = targetBarcodePixelWidth / sourceBarcodeWidth;
-            
-            actualContentWidth = targetBarcodePixelWidth; // Set content width to the target
-            actualContentHeight = sourceBarcodeHeight * scaleFactor; // Scale height proportionally
-
-            // Ensure minimum dimensions for visibility
-            if (actualContentWidth < 10) actualContentWidth = 10;
-            if (actualContentHeight < 10) actualContentHeight = 10;
-
-        } catch (e) { // Handle errors during barcode generation
-            console.error("Barcode generation error:", e.message, "Data:", data);
-            // Fallback: Display an error message on the canvas
-            ctx.fillStyle = 'red';
-            ctx.font = `bold 16px Arial`; // Fixed size for error message
-            const errorMsg = "Barcode Error";
-            actualContentWidth = ctx.measureText(errorMsg).width;
-            actualContentHeight = 16; // Approximate height for 16px text
-
-            // Calculate position for the error message box
-            elementWidth = actualContentWidth + 2 * padding;
-            elementHeight = actualContentHeight + 2 * padding;
-            if (position.includes('left')) elementX = marginX;
-            else if (position.includes('right')) elementX = imageDisplayWidth - elementWidth - marginX;
-            else elementX = (imageDisplayWidth - elementWidth) / 2; // Center X
-
-            if (position.includes('top')) elementY = marginY;
-            else if (position.includes('bottom')) elementY = imageDisplayHeight - elementHeight - marginY;
-            else elementY = (imageDisplayHeight - elementHeight) / 2; // Center Y
-
-            if (position === 'center') { // Explicit center
-                elementX = (imageDisplayWidth - elementWidth) / 2;
-                elementY = (imageDisplayHeight - elementHeight) / 2;
-            }
-            // Draw rectangular background for error message (not rounded for simplicity here)
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-            ctx.fillRect(elementX, elementY, elementWidth, elementHeight);
-            // Draw error text
-            ctx.fillStyle = 'red';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(errorMsg, elementX + elementWidth / 2, elementY + elementHeight / 2);
-            return; // Stop further drawing for this element if error occurred
-        }
-    } else { // Plain text element
-        ctx.font = `bold ${mainTextFontSize}px Arial`; // Set font for measuring text
-        const textMetrics = ctx.measureText(data); // Measure text width
-        actualContentWidth = textMetrics.width;
-        actualContentHeight = mainTextFontSize; // Height is based on font size for simple text
+    // 2. Handle Barcode Generation Error (if any)
+    if (error && drawBarcodeFlag) { // Only draw error message if it was a barcode attempt that failed
+        const errorStampWidth = actualContentWidth + 2 * padding; // actualContentWidth is now error message width
+        const errorStampHeight = actualContentHeight + 2 * padding; // actualContentHeight is now error message height
+        
+        const { elementX: errorX, elementY: errorY } = calculateStampCoordinates(position, imageDisplayWidth, imageDisplayHeight, errorStampWidth, errorStampHeight, marginX, marginY);
+        
+        // Draw rectangular background for error message (not rounded for simplicity here)
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.fillRect(errorX, errorY, errorStampWidth, errorStampHeight);
+        // Draw error text
+        ctx.fillStyle = 'red';
+        ctx.font = `bold 16px Arial`; // Ensure font is set for error message
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(errorMsg, errorX + errorStampWidth / 2, errorY + errorStampHeight / 2);
+        return; // Stop further drawing for this element
     }
 
-    // Calculate overall element dimensions including padding
-    elementWidth = actualContentWidth + 2 * padding;
-    elementHeight = actualContentHeight + 2 * padding;
+    // 3. Calculate Overall Stamp Dimensions (content + padding)
+    const stampWidth = actualContentWidth + 2 * padding;
+    const stampHeight = actualContentHeight + 2 * padding;
 
-    // Calculate X position based on selected alignment
-    if (position.includes('left')) elementX = marginX;
-    else if (position.includes('right')) elementX = imageDisplayWidth - elementWidth - marginX;
-    else elementX = (imageDisplayWidth - elementWidth) / 2; // Default to center X
+    // 4. Calculate Stamp Position
+    const { elementX, elementY } = calculateStampCoordinates(position, imageDisplayWidth, imageDisplayHeight, stampWidth, stampHeight, marginX, marginY);
 
-    // Calculate Y position based on selected alignment
-    if (position.includes('top')) elementY = marginY;
-    else if (position.includes('bottom')) elementY = imageDisplayHeight - elementHeight - marginY;
-    else elementY = (imageDisplayHeight - elementHeight) / 2; // Default to center Y
-    
-    // Explicit center position overrides
-    if (position === 'center') {
-        elementX = (imageDisplayWidth - elementWidth) / 2;
-        elementY = (imageDisplayHeight - elementHeight) / 2;
-    }
+    // 5. Draw Stamp Background
+    drawStampBackground(ctx, elementX, elementY, stampWidth, stampHeight, cornerRadius, 'rgba(255, 255, 255, 0.9)', 'rgba(200, 200, 200, 0.9)', 1);
 
-    // MODIFIED: Draw rounded rectangle for the background stamp
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'; // Semi-transparent white background
-    ctx.strokeStyle = 'rgba(200, 200, 200, 0.9)'; // Light gray border
-    ctx.lineWidth = 1; // Border width
-
-    roundRect(ctx, elementX, elementY, elementWidth, elementHeight, cornerRadius); // Create the rounded path
-    ctx.fill();   // Fill the path
-    ctx.stroke(); // Stroke the path (draw the border)
-    // END OF MODIFICATION for rounded background
-
-    // Calculate drawing position for the actual content (text or barcode) inside the padded box
+    // 6. Draw Stamp Content (Text or Barcode)
     const contentDrawX = elementX + padding;
     const contentDrawY = elementY + padding;
-
-    if (drawBarcode) { // If drawing a barcode, draw the measured & scaled barcode
-        // Re-generate barcode on a final canvas to draw with correct scaling.
-        // This ensures the barcode is crisp when drawn onto the main canvas.
-        const finalBarcodeCanvas = document.createElement('canvas');
-        try {
-            JsBarcode(finalBarcodeCanvas, data, {
-                format: "CODE128", width: 2, height: 50, displayValue: true, 
-                fontSize: mainTextFontSize, // Use consolidated font size
-                margin: 5 
-            });
-            if (finalBarcodeCanvas.width > 0 && finalBarcodeCanvas.height > 0) {
-                 // Draw the generated barcode, scaling it to fit actualContentWidth/Height
-                 ctx.drawImage(finalBarcodeCanvas, contentDrawX, contentDrawY, actualContentWidth, actualContentHeight);
-            }
-        } catch(e) { /* Error already handled by the first try-catch block for barcode generation */ }
-    } else { // Plain text
-        ctx.fillStyle = '#000000'; // Black text color
-        ctx.textAlign = 'center'; // Align text to the center of its calculated box
-        ctx.textBaseline = 'middle'; // Align text vertically to the middle
-        // Calculate center for text fill based on the padded element box
-        const textDrawCenterX = elementX + elementWidth / 2;
-        const textDrawCenterY = elementY + elementHeight / 2;
-        ctx.fillText(data, textDrawCenterX, textDrawCenterY); // Draw the text
-    }
+    
+    drawStampContent(ctx, data, drawBarcodeFlag, contentElement, contentDrawX, contentDrawY, actualContentWidth, actualContentHeight, mainTextFontSize, elementX, stampWidth, elementY, stampHeight);
 }
+
 
 /**
  * Checks if all required inputs (images, text, position) are provided.
@@ -543,7 +596,9 @@ function processImages() {
                 ctx.drawImage(img, 0, 0, tempCanvas.width, tempCanvas.height); // Draw original image on temp canvas
                 
                 // Draw the stamp (text or barcode) onto the temporary canvas
-                drawElement(ctx, userText, selectedPosition, tempCanvas.width, tempCanvas.height, currentFontSize, currentTextPadding, isBarcodeEnabled, currentBarcodeWidthPercentage, img.naturalWidth, currentFontSize, STAMP_CORNER_RADIUS); 
+                // Note: The 10th argument to drawElement was barcodeValFontSize, which is now effectively mainTextFontSize.
+                // The last argument is cornerRadius.
+                drawElement(ctx, userText, selectedPosition, tempCanvas.width, tempCanvas.height, currentFontSize, currentTextPadding, isBarcodeEnabled, currentBarcodeWidthPercentage, img.naturalWidth, STAMP_CORNER_RADIUS); 
                 
                 // Get the processed image as a Data URL (JPEG format)
                 const processedImageDataUrl = tempCanvas.toDataURL('image/jpeg', 0.9); // 0.9 is quality
@@ -551,13 +606,16 @@ function processImages() {
                 addImageToGallery(processedImageDataUrl, file.name); // Add to visual gallery on the page
                 
                 processedCount++; // Increment successful count
-                progressBar.value = (processedCount / selectedImages.length) * 100; // Update progress bar
-                progressTextEl.textContent = `Processing ${processedCount}/${selectedImages.length} images...`; // Update progress text
+                // Calculate total attempts to correctly update progress when errors occur
+                let totalAttempts = processedCount + errorCount;
+                progressBar.value = (totalAttempts / selectedImages.length) * 100; // Update progress bar based on total attempts
+                progressTextEl.textContent = `Processing ${totalAttempts}/${selectedImages.length} images...`;
+
 
                 // Check if all images have been attempted
-                if ((processedCount + errorCount) === selectedImages.length) {
+                if (totalAttempts === selectedImages.length) {
                     if (errorCount > 0) {
-                         progressTextEl.textContent = `Completed processing ${processedCount}/${selectedImages.length} images. ${errorCount} error(s).`;
+                         progressTextEl.textContent = `Completed. Processed: ${processedCount}/${selectedImages.length}. Errors: ${errorCount}.`;
                     } else {
                         progressTextEl.textContent = `Completed processing ${selectedImages.length} images!`;
                     }
@@ -570,13 +628,16 @@ function processImages() {
             img.onerror = function() { // Handle error loading an image
                 console.error("Error processing image:", file.name);
                 errorCount++; // Increment error count
-                progressTextEl.textContent = `Error processing ${file.name}. Skipping. (${processedCount + errorCount}/${selectedImages.length})`;
+                let totalAttempts = processedCount + errorCount;
+                progressTextEl.textContent = `Error processing ${file.name}. (${totalAttempts}/${selectedImages.length})`;
+                progressBar.value = (totalAttempts / selectedImages.length) * 100;
+
                 // Check if all images have been attempted after an error
-                 if ((processedCount + errorCount) === selectedImages.length) {
+                 if (totalAttempts === selectedImages.length) {
                     if (errorCount === selectedImages.length) {
                         progressTextEl.textContent = `All ${errorCount} images failed to process.`;
                     } else {
-                        progressTextEl.textContent = `Completed processing with ${errorCount} error(s).`;
+                         progressTextEl.textContent = `Completed. Processed: ${processedCount}/${selectedImages.length}. Errors: ${errorCount}.`;
                     }
                     if (downloadAllCheckbox.checked && processedImages.length > 0) {
                         downloadAllProcessedImages();
@@ -588,13 +649,16 @@ function processImages() {
         reader.onerror = function() { // Handle error reading a file
             console.error("Error reading file:", file.name);
             errorCount++;
-            progressTextEl.textContent = `Error reading ${file.name}. Skipping. (${processedCount + errorCount}/${selectedImages.length})`;
+            let totalAttempts = processedCount + errorCount;
+            progressTextEl.textContent = `Error reading ${file.name}. (${totalAttempts}/${selectedImages.length})`;
+            progressBar.value = (totalAttempts / selectedImages.length) * 100;
+
             // Check if all images have been attempted after a file read error
-            if ((processedCount + errorCount) === selectedImages.length) {
+            if (totalAttempts === selectedImages.length) {
                  if (errorCount === selectedImages.length) {
                         progressTextEl.textContent = `All ${errorCount} images failed to load.`;
                     } else {
-                        progressTextEl.textContent = `Completed processing with ${errorCount} file reading error(s).`;
+                        progressTextEl.textContent = `Completed. Processed: ${processedCount}/${selectedImages.length}. Errors: ${errorCount}.`;
                     }
                 if (downloadAllCheckbox.checked && processedImages.length > 0) {
                     downloadAllProcessedImages();
