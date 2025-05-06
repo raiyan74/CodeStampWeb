@@ -13,6 +13,9 @@
     <script src="script.js" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
+</head>
+
 </head>
 <body>
     <div class="container">
@@ -44,26 +47,50 @@
         
         <div class="section">
             <div class="section-title">3. Text Stamp Position</div>
-            <div class="position-buttons">
-                <div class="position-button" data-position="top-left">Top Left</div>
-                <div class="position-button" data-position="top-right">Top Right</div>
-                <div class="position-button" data-position="bottom-left">Bottom Left</div>
-                <div class="position-button" data-position="bottom-right">Bottom Right</div>
-                <div class="position-button" data-position="center">Center</div>
+            <div class="position-grid-container">
+                <button class="position-button icon-btn" data-position="top-left" title="Top Left">↖</button>
+                <button class="position-button icon-btn" data-position="top-center" title="Top Center">↑</button>
+                <button class="position-button icon-btn" data-position="top-right" title="Top Right">↗</button>
+                
+                <button class="position-button icon-btn" data-position="middle-left" title="Middle Left">←</button>
+                <button class="position-button icon-btn" data-position="center" title="Center">●</button>
+                <button class="position-button icon-btn" data-position="middle-right" title="Middle Right">→</button>
+                
+                <button class="position-button icon-btn" data-position="bottom-left" title="Bottom Left">↙</button>
+                <button class="position-button icon-btn" data-position="bottom-center" title="Bottom Center">↓</button>
+                <button class="position-button icon-btn" data-position="bottom-right" title="Bottom Right">↘</button>
             </div>
-            <div id="position-value" style="margin-top: 10px;">Selected Position: None</div>
+            <div id="position-value" style="margin-top: 15px;">Selected Position: None</div>
         </div>
 
         <div class="section">
-            <div class="section-title">4. Text Style (Optional)</div>
+            <div class="section-title">4. Style Options</div>
+        <!--
             <div class="input-group">
-                <label for="font-size-input">Font Size (px):</label>
+                <label for="font-size-input">Font Size (px) (for text only):</label>
                 <input type="number" id="font-size-input" value="24" min="10" max="100" style="width: 60px; padding: 8px; border-radius: 4px; border: 1px solid #4d4d4d; background-color: #252525; color: #e0e0e0; margin-left: 5px;">
             </div>
+        -->
              <div class="input-group" style="margin-top: 10px;">
-                <label for="text-padding-input">Padding around text (px):</label>
+                <label for="text-padding-input">Padding around element (px):</label>
                 <input type="number" id="text-padding-input" value="10" min="0" max="50" style="width: 60px; padding: 8px; border-radius: 4px; border: 1px solid #4d4d4d; background-color: #252525; color: #e0e0e0; margin-left: 5px;">
             </div>
+
+            <div class="input-group" id="barcode-width-slider-group" style="margin-top: 15px; display: none;">
+                <label for="barcode-width-slider">Barcode Width (% of image width): <span id="barcode-width-value-display">20</span>%</label>
+                <input type="range" id="barcode-width-slider" min="0" max="100" value="20" style="width: 100%; margin-top: 5px;">
+                <small style="display: block; margin-top: 5px; color: #aaa;">Min 5% will be used. 0% is invalid if barcode is active.</small>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">5. Element Type</div>
+            <div class="input-group">
+                <div class="download-option"> <input type="checkbox" id="barcode-checkbox">
+                    <label for="barcode-checkbox">Use Bar Code (CODE128)</label>
+                </div>
+            </div>
+            <div id="barcode-status" style="margin-top: 10px;"></div>
         </div>
         
         <div class="download-option">
