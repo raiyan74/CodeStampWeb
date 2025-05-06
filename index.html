@@ -6,7 +6,7 @@
     <meta name="author" content="Raiyan"> <meta name="description" content="TextStamp Web - A web-based tool to add custom text stamps to images in bulk. Images are processed locally in your browser.">
 
     <link rel="icon" href="favicon-32x32.png" type="image/png">
-    <title>TextStamp Web - Batch Image Text Adder</title>
+    <title>CodeStamp Web - Batch Image Barcode Adder</title>
 
     <link href="style.css" rel="stylesheet">
 
@@ -24,7 +24,7 @@
             <img src="favicon-96x96.png" alt="TextStamp Web Logo" class="centered-logo">
         </div>
 
-        <h1>TextStamp Web</h1>
+        <h1>CodeStamp Web</h1>
         
         <div class="section">
             <div class="section-title">1. Select Images to Process</div>
@@ -38,15 +38,15 @@
         </div>
         
         <div class="section">
-            <div class="section-title">2. Enter Text to Add</div>
+            <div class="section-title">2. Enter Product code</div>
             <div class="input-group">
-                <input type="text" id="text-input" placeholder="e.g., 00005478TT" style="width: calc(100% - 22px); padding: 10px; border-radius: 4px; border: 1px solid #4d4d4d; background-color: #252525; color: #e0e0e0;">
+                <input type="text" id="text-input" placeholder="e.g., TT10287" style="width: calc(100% - 22px); padding: 10px; border-radius: 4px; border: 1px solid #4d4d4d; background-color: #252525; color: #e0e0e0;">
                 <div id="text-input-status" style="margin-top: 10px;"></div>
             </div>
         </div>
         
         <div class="section">
-            <div class="section-title">3. Text Stamp Position</div>
+            <div class="section-title">3. Stamp Position</div>
             <div class="position-grid-container">
                 <button class="position-button icon-btn" data-position="top-left" title="Top Left">↖</button>
                 <button class="position-button icon-btn" data-position="top-center" title="Top Center">↑</button>
@@ -67,7 +67,7 @@
             <div class="section-title">4. Style Options</div>
         
             <div class="input-group">
-                <label for="font-size-input">Font Size (px) (for text only):</label>
+                <label for="font-size-input">Font Size (px):</label>
                 <input type="number" id="font-size-input" value="24" min="10" max="100" style="width: 60px; padding: 8px; border-radius: 4px; border: 1px solid #4d4d4d; background-color: #252525; color: #e0e0e0; margin-left: 5px;">
             </div>
         
@@ -84,10 +84,10 @@
         </div>
 
         <div class="section">
-            <div class="section-title">5. Element Type</div>
+            <div class="section-title">5. Code Type</div>
             <div class="input-group">
                 <div class="download-option"> <input type="checkbox" id="barcode-checkbox">
-                    <label for="barcode-checkbox">Use Bar Code (CODE128)</label>
+                    <label for="barcode-checkbox">Bar Code (CODE128)</label>
                 </div>
             </div>
             <div id="barcode-status" style="margin-top: 10px;"></div>
