@@ -1,0 +1,396 @@
+/* style.css for TextStamp Web
+    This file is largely the same as the original style.css from AutoGo Web
+    to maintain the theme and aesthetic.
+    Minor adjustments or additions for new elements like the text input
+    are made inline in the HTML or are designed to use existing styles.
+    No major changes are required here if the HTML uses similar class structures.
+*/
+body {
+    font-family: 'Trebuchet MS', Arial, sans-serif; /* Added fallback fonts */
+    margin: 0;
+    padding: 20px;
+    background-color: #121212; /* Dark background */
+    color: #e0e0e0; /* Light text */
+    line-height: 1.6; /* Improved readability */
+}
+
+.container {
+    max-width: 800px;
+    margin: 20px auto; /* Added top/bottom margin */
+    background-color: #1e1e1e; /* Slightly lighter dark shade for container */
+    padding: 25px; /* Increased padding */
+    border-radius: 10px; /* Slightly more rounded corners */
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5); /* Enhanced shadow */
+}
+
+.logo-container {
+    text-align: center;
+    margin-bottom: 20px; /* Increased margin */
+}
+
+.centered-logo {
+    height: 50px; 
+    /* Consider using an SVG or a more abstract logo for "TextStamp" if available */
+}
+
+h1 {
+    color: #81c4ff; /* Light blue accent for heading */
+    text-align: center;
+    margin-bottom: 35px; /* Increased margin */
+    font-size: 2.2em; /* Larger heading */
+}
+
+/* Footer styles */
+footer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    margin-top: 50px; /* Increased margin */
+    padding: 25px 0; /* Increased padding */
+    border-top: 1px solid #2d2d2d; /* Subtle top border */
+}
+
+footer div {
+    margin: 8px 0; /* Increased margin */
+}
+
+footer p {
+    margin: 0;
+    color: #81c4ff; 
+    font-size: 0.9em;
+}
+
+footer a {
+    color: #81c4ff;
+    text-decoration: none;
+}
+footer a:hover {
+    text-decoration: underline;
+}
+
+.section {
+    margin-bottom: 30px; /* Increased margin */
+    padding: 20px; /* Increased padding */
+    background-color: #2d2d2d; /* Darker section background */
+    border-radius: 6px; /* Consistent rounded corners */
+    border: 1px solid #383838; /* Subtle border for sections */
+}
+
+.section-title {
+    font-weight: bold;
+    margin-bottom: 15px; /* Increased margin */
+    color: #81c4ff;
+    font-size: 1.3em; /* Larger section titles */
+    border-bottom: 1px solid #444; /* Underline for title */
+    padding-bottom: 8px; /* Space below underline */
+}
+
+.input-group {
+    margin-bottom: 15px;
+}
+.input-group label { /* Styling for labels within input groups */
+    display: block;
+    margin-bottom: 8px;
+    color: #cccccc; /* Lighter gray for labels */
+    font-size: 0.95em;
+}
+
+/* Styling for text inputs, number inputs */
+input[type="text"],
+input[type="number"] {
+    background-color: #252525 !important; /* Ensure dark background */
+    color: #e0e0e0 !important; /* Ensure light text */
+    border: 1px solid #4d4d4d !important; /* Consistent border */
+    padding: 10px !important; /* Consistent padding */
+    border-radius: 4px !important; /* Consistent radius */
+    box-sizing: border-box; /* Ensure padding doesn't expand element size */
+}
+input[type="text"]:focus,
+input[type="number"]:focus {
+    border-color: #3498db; /* Highlight on focus */
+    outline: none; /* Remove default outline */
+    box-shadow: 0 0 5px rgba(52, 152, 219, 0.5);
+}
+
+
+button, .file-input-container button { /* General button styling */
+    background-color: #3498db; /* Primary blue */
+    color: white;
+    border: none;
+    padding: 12px 18px; /* Slightly larger padding */
+    border-radius: 5px; /* More rounded */
+    cursor: pointer;
+    font-size: 1em; /* Relative font size */
+    transition: background-color 0.2s ease, transform 0.1s ease; /* Smooth transitions */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+button:hover, .file-input-container button:hover {
+    background-color: #2980b9; /* Darker blue on hover */
+    transform: translateY(-1px); /* Slight lift on hover */
+}
+button:active, .file-input-container button:active {
+    transform: translateY(0px); /* Press effect */
+}
+button:disabled {
+    background-color: #555 !important;
+    color: #888 !important;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}
+
+
+.position-buttons {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); /* Responsive grid */
+    gap: 12px; /* Increased gap */
+    margin-top: 10px;
+}
+
+.position-button {
+    padding: 12px; /* Increased padding */
+    text-align: center;
+    background-color: #3a3a3a; /* Slightly different background for non-selected */
+    border: 2px solid #4d4d4d;
+    border-radius: 5px; /* More rounded */
+    cursor: pointer;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+.position-button:hover {
+    background-color: #4a4a4a;
+    border-color: #5a5a5a;
+}
+.position-button.selected {
+    background-color: #3498db;
+    color: white;
+    border-color: #2980b9;
+    font-weight: bold;
+}
+
+#preview-canvas {
+    max-width: 100%;
+    border: 1px solid #444; /* Darker border for preview */
+    display: none; /* Initially hidden */
+    margin-top: 15px; /* Space above canvas */
+    background-color: #282828; /* Background for canvas area */
+    border-radius: 4px;
+}
+
+#process-button {
+    background-color: #27ae60; /* Green for primary action */
+    padding: 14px 22px; /* Larger padding */
+    font-size: 1.1em; /* Larger font */
+    width: 100%;
+    margin-top: 25px; /* Increased margin */
+}
+#process-button:hover {
+    background-color: #2ecc71; /* Lighter green on hover */
+}
+
+.progress-container {
+    margin-top: 25px;
+    display: none; /* Initially hidden */
+}
+#progress-text {
+    margin-bottom: 8px;
+    font-size: 0.95em;
+}
+progress {
+    width: 100%;
+    height: 28px; /* Taller progress bar */
+    border-radius: 4px;
+    overflow: hidden; /* Ensures border radius is respected by value */
+}
+/* Styling for progress bar value (track and bar) */
+progress::-webkit-progress-bar {
+    background-color: #333;
+    border-radius: 4px;
+}
+progress::-webkit-progress-value {
+    background-color: #27ae60; /* Green progress */
+    border-radius: 4px;
+    transition: width 0.3s ease; /* Smooth progress update */
+}
+progress::-moz-progress-bar { /* Firefox specific */
+    background-color: #27ae60;
+    border-radius: 4px;
+}
+
+
+#gallery {
+    margin-top: 35px; /* Increased margin */
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); /* Larger items */
+    gap: 20px; /* Increased gap */
+}
+
+.result-image-container { /* Wrapper for image and download button */
+    background-color: #2d2d2d;
+    padding: 10px;
+    border-radius: 6px;
+    text-align: center;
+    border: 1px solid #383838;
+}
+
+.result-image {
+    width: 100%;
+    height: auto;
+    border: 1px solid #444; /* Darker border */
+    border-radius: 4px;
+    margin-bottom: 10px; /* Space between image and button */
+}
+
+.download-btn { /* Class for download buttons in gallery */
+    display: block;
+    background-color: #3498db;
+    color: white;
+    text-decoration: none;
+    padding: 8px 10px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    transition: background-color 0.2s ease;
+}
+.download-btn:hover {
+    background-color: #2980b9;
+}
+
+
+.file-input-container {
+    position: relative;
+    overflow: hidden;
+    display: inline-block; /* So button takes content width */
+    cursor: pointer;
+}
+.file-input-container input[type="file"] {
+    position: absolute;
+    font-size: 100px; /* Large to cover button */
+    right: 0;
+    top: 0;
+    opacity: 0; /* Make it invisible */
+    cursor: pointer;
+}
+
+/* Reset button style */
+.reset-container {
+    margin-top: 30px; /* Increased margin */
+    text-align: center; /* Center reset button and label */
+    padding-top: 20px;
+    border-top: 1px solid #2d2d2d;
+}
+.reset-header {
+    display: flex; /* Use flex for better alignment */
+    flex-direction: column; /* Stack button and label on small screens */
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 15px;
+}
+.reset-header label {
+    margin-top: 8px; /* Space between button and label */
+    font-size: 0.9em;
+    color: #aaa;
+}
+@media (min-width: 600px) { /* Side-by-side on larger screens */
+    .reset-header {
+        flex-direction: row;
+        justify-content: space-between;
+    }
+    .reset-header label {
+        margin-top: 0;
+        margin-left: 15px;
+    }
+}
+
+
+#reset-button {
+    background-color: #e74c3c; /* Red for reset/danger */
+    color: white;
+    /* Other button styles (padding, border-radius, etc.) inherited or can be specific */
+}
+#reset-button:hover {
+    background-color: #c0392b; /* Darker red on hover */
+}
+
+/* Improved checkbox styling (from original, should work fine) */
+.download-option {
+    margin-top: 20px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    /* background-color: transparent; */ /* Already transparent by default */
+    padding: 10px; /* Padding around checkbox and label */
+    border-radius: 4px;
+    /* border: 1px solid #2d2d2d; */ /* Optional border */
+}
+
+.download-option input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 24px; /* Slightly smaller */
+    height: 24px;
+    background-color: #252525; /* Dark background for checkbox */
+    border: 2px solid #3498db; /* Blue border */
+    border-radius: 4px;
+    cursor: pointer;
+    position: relative;
+    margin-right: 12px; /* Increased space to label */
+    flex-shrink: 0; /* Prevent shrinking */
+}
+
+.download-option input[type="checkbox"]:checked {
+    background-color: #3498db; /* Blue when checked */
+    border-color: #2980b9;
+}
+
+.download-option input[type="checkbox"]::after { /* Checkmark */
+    content: '✓';
+    font-size: 18px; /* Adjusted size */
+    font-weight: bold;
+    color: white;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    transition: transform 0.15s ease-in-out;
+}
+
+.download-option input[type="checkbox"]:checked::after {
+    transform: translate(-50%, -50%) scale(1);
+}
+
+.download-option label {
+    font-family: 'Trebuchet MS', sans-serif;
+    display: inline-block;
+    cursor: pointer;
+    font-size: 1em; /* Consistent font size */
+    color: #e0e0e0;
+    line-height: 24px; /* Match checkbox height */
+    margin: 0;
+    padding: 0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+    body {
+        padding: 10px;
+    }
+    .container {
+        padding: 15px;
+    }
+    h1 {
+        font-size: 1.8em;
+    }
+    .section-title {
+        font-size: 1.1em;
+    }
+    .position-buttons {
+        grid-template-columns: 1fr 1fr; /* Two columns on smaller screens */
+    }
+    #gallery {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    }
+    .download-option label {
+        font-size: 0.9em;
+    }
+}
