@@ -137,45 +137,18 @@ button:disabled {
     transform: none;
 }
 
-/* --- Position Grid Styling (9-button layout) --- */
-.position-grid-container {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr); /* Creates 3 equal columns */
-    gap: 8px; /* Gap between buttons */
-    max-width: 180px; /* Limit width of the grid container, adjust as needed */
-    margin: 10px auto; /* Center the grid container within its parent */
+/* --  position selection canvas --- */
+#position-plane {
+    width: 100%;
+    max-width: 240px; /* Adjust max-width as desired */
+    aspect-ratio: 3 / 4; /* Rectangular shape like in the screenshot */
+    background-color: #2d2d2d;
+    border: 1px solid #4d4d4d;
+    border-radius: 4px;
+    margin: 10px auto; /* Center the element */
+    cursor: crosshair;
 }
 
-.position-button.icon-btn { /* Specific styling for the new grid buttons */
-    padding: 0; /* Remove padding if icon size is controlled by font-size and aspect-ratio */
-    width: 100%; /* Make button take full width of grid cell */
-    aspect-ratio: 1 / 1; /* Make buttons square */
-    font-size: 1.5em; /* Adjust size of the icon/text character (e.g., arrows) */
-    line-height: 1; /* Helps center icon vertically if it's a text character */
-    display: flex; /* For centering content within the button */
-    align-items: center;
-    justify-content: center;
-    background-color: #3a3a3a; /* Default background for position buttons */
-    border: 2px solid #4d4d4d; /* Default border */
-    border-radius: 5px;
-    cursor: pointer;
-    color: #e0e0e0; /* Default icon color */
-    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
-}
-
-.position-button.icon-btn:hover {
-    background-color: #4a4a4a; /* Slightly lighter on hover */
-    border-color: #5a5a5a;
-    transform: translateY(-1px); /* Subtle lift effect */
-}
-
-.position-button.icon-btn.selected {
-    background-color: #3498db; /* Blue when selected (matches other primary buttons) */
-    color: white; /* White icon when selected */
-    border-color: #2980b9; /* Darker blue border when selected */
-    /* font-weight: bold; */ /* Optional: make icon bolder when selected */
-}
-/* --- End of Position Grid Styling --- */
 
 
 #preview-canvas {

@@ -1,374 +1,390 @@
-// Global variables
-let selectedImages = []; // Array to store the files of the selected images
-let userText = ''; // String to store the text input by the user, or data for the barcode
-let selectedPosition = null; // String to store the selected position for the text/barcode stamp (e.g., 'top-left')
-let processedImages = []; // Array to store objects of processed images { name: string, dataUrl: string }
-let currentFontSize = 24; // Number: Default and current font size for text stamps or the value displayed with a barcode
-let currentTextPadding = 10; // Number: Default and current padding around the text or barcode element
-let isBarcodeEnabled = false; // Boolean: Tracks if barcode mode is active
-let currentBarcodeWidthPercentage = 20; // ADDED: Default and current barcode width as a percentage of image width
-// let currentBarcodeValueFontSize = 16; // REMOVED/DEPRECATED: Font size for text under barcode is now controlled by currentFontSize
+// --- Global Variables ---
+// These variables store the application's state and user's selections.
 
-// Constants
-const STAMP_CORNER_RADIUS = 8; // ADDED: Define the corner radius for the stamp background. Adjust for more/less roundness.
+let selectedImages = []; // An array to hold the File objects of the images selected by the user.
+let userText = ''; // A string to store the text input by the user.
+let customPosition = null; // An object {x, y} to store the normalized coordinates (0 to 1) for the stamp's center.
+let processedImages = []; // An array to store the processed images as data URLs, along with their original names.
+let currentFontSize = 24; // The font size for the text or barcode value, in pixels.
+let currentTextPadding = 10; // The padding around the text or barcode within the stamp, in pixels.
+let isBarcodeEnabled = false; // A boolean flag to determine if the user wants to generate a barcode.
+let currentBarcodeWidthPercentage = 20; // The desired width of the barcode as a percentage of the image's total width.
+let currentOpacity = 0.9; // The opacity of the stamp (from 0.0 to 1.0).
 
-// DOM Elements - References to HTML elements used for interaction and display
-const imageInput = document.getElementById('image-input'); // Input element for selecting image files
-const textInput = document.getElementById('text-input'); // Input element for the user to enter text/data
-const imageCountEl = document.getElementById('image-count'); // Element to display the count of selected images
-const textInputStatusEl = document.getElementById('text-input-status'); // Element to display status/feedback for the text input
-const positionButtons = document.querySelectorAll('.position-button'); // NodeList of all position selection buttons
-const positionValueEl = document.getElementById('position-value'); // Element to display the currently selected position
-const fontSizeInput = document.getElementById('font-size-input'); // Input element for setting the font size
-const textPaddingInput = document.getElementById('text-padding-input'); // Input element for setting padding around the stamp
+// --- Constants ---
+// A constant value for the corner radius of the stamp's background.
+const STAMP_CORNER_RADIUS = 8;
 
-// DOM element for the main font size input's label (to dynamically change its text)
-const fontSizeInputLabel = document.getElementById('font-size-input-label'); // Ensure this ID is on the <label> in HTML
+// --- DOM Elements ---
+// References to HTML elements are stored in constants for easy access.
 
-// ADDED: DOM element for barcode value font size (now hidden and superseded by fontSizeInput)
-const barcodeValueFontSizeInput = document.getElementById('barcode-value-font-size-input'); // Input for dedicated barcode font size (if it exists in HTML)
-const barcodeValueFontSizeGroup = document.getElementById('barcode-value-font-size-group'); // Container for the dedicated barcode font size input
-
-// ADDED: Barcode width slider control DOM elements
-const barcodeWidthSlider = document.getElementById('barcode-width-slider'); // Range input for barcode width percentage
-const barcodeWidthValueDisplay = document.getElementById('barcode-width-value-display'); // Span to show the current barcode width percentage
-const barcodeWidthSliderGroup = document.getElementById('barcode-width-slider-group'); // Container for the barcode width slider (for visibility control)
-
-const previewCanvas = document.getElementById('preview-canvas'); // Canvas element for showing a preview of the stamp on an image
-const processButton = document.getElementById('process-button'); // Button to start processing the selected images
-const downloadAllCheckbox = document.getElementById('download-all-checkbox'); // Checkbox to enable/disable downloading all images as a ZIP
-const progressContainer = document.querySelector('.progress-container'); // Container for the progress bar and text
-const progressBar = document.getElementById('progress-bar'); // Progress bar element
-const progressTextEl = document.getElementById('progress-text'); // Element to display text updates during processing
-const gallery = document.getElementById('gallery'); // Container to display processed image thumbnails
-const resetButton = document.getElementById('reset-button'); // Button to reset the application state
-
-const barcodeCheckbox = document.getElementById('barcode-checkbox'); // Checkbox to toggle barcode mode
-const barcodeStatusEl = document.getElementById('barcode-status'); // Element to display status related to barcode mode
+const imageInput = document.getElementById('image-input');
+const textInput = document.getElementById('text-input');
+const imageCountEl = document.getElementById('image-count');
+const textInputStatusEl = document.getElementById('text-input-status');
+const positionValueEl = document.getElementById('position-value');
+const fontSizeInput = document.getElementById('font-size-input');
+const textPaddingInput = document.getElementById('text-padding-input');
+const positionPlane = document.getElementById('position-plane');
+let posPlaneCtx = null; // The 2D rendering context for the position selection canvas.
+const opacitySlider = document.getElementById('opacity-slider');
+const opacityValueDisplay = document.getElementById('opacity-value-display');
+const barcodeWidthSlider = document.getElementById('barcode-width-slider');
+const barcodeWidthValueDisplay = document.getElementById('barcode-width-value-display');
+const barcodeWidthSliderGroup = document.getElementById('barcode-width-slider-group');
+const previewCanvas = document.getElementById('preview-canvas');
+const processButton = document.getElementById('process-button');
+const downloadAllCheckbox = document.getElementById('download-all-checkbox');
+const progressContainer = document.querySelector('.progress-container');
+const progressBar = document.getElementById('progress-bar');
+const progressTextEl = document.getElementById('progress-text');
+const gallery = document.getElementById('gallery');
+const resetButton = document.getElementById('reset-button');
+const barcodeCheckbox = document.getElementById('barcode-checkbox');
+const barcodeStatusEl = document.getElementById('barcode-status');
 
 // --- Functions ---
 
 /**
- * Handles the selection of image files by the user.
- * Updates the `selectedImages` array and the image count display.
- * Loads the first selected image for preview.
- * @param {Event} e - The file input change event.
+ * Handles the user's selection of image files.
+ * Updates the 'selectedImages' array and the UI to show the count.
+ * It also triggers loading the first selected image into the preview canvas.
+ * @param {Event} e - The 'change' event from the file input.
  */
 function handleImageSelection(e) {
-    selectedImages = Array.from(e.target.files); // Convert FileList to Array
-    imageCountEl.textContent = `Selected ${selectedImages.length} image(s)`; // Update UI with count
+    selectedImages = Array.from(e.target.files);
+    imageCountEl.textContent = `Selected ${selectedImages.length} image(s)`;
     if (selectedImages.length > 0) {
-        loadImageForPreview(selectedImages[0]); // Load the first image for preview
+        // If images are selected, load the first one for a preview.
+        loadImageForPreview(selectedImages[0]);
     } else {
-        previewCanvas.style.display = 'none'; // Hide preview if no images selected
-        if (previewCanvas.loadedImageObject) previewCanvas.loadedImageObject = null; // Clear cached preview image
+        // If no images are selected, hide the preview canvas.
+        previewCanvas.style.display = 'none';
+        if (previewCanvas.loadedImageObject) previewCanvas.loadedImageObject = null;
     }
-    checkIfReadyToProcess(); // Check if the process button should be enabled
+    checkIfReadyToProcess(); // Check if the "Process" button can be enabled.
 }
 
 /**
  * Handles changes in the text input field.
- * Updates the `userText` variable and the text input status display.
- * Triggers a preview update.
- * @param {Event} e - The text input event.
+ * Updates the 'userText' variable and the UI status message.
+ * @param {Event} e - The 'input' event from the text field.
  */
 function handleTextChange(e) {
-    userText = e.target.value.trim(); // Get and trim the input text
+    userText = e.target.value.trim();
     if (userText) {
-        textInputStatusEl.textContent = `Data to use: "${userText}"`; // Update status
+        textInputStatusEl.textContent = `Data to use: "${userText}"`;
     } else {
-        textInputStatusEl.textContent = 'No data entered.'; // Update status for empty input
+        textInputStatusEl.textContent = 'No data entered.';
     }
-    updatePreview(); // Refresh the preview canvas
-    checkIfReadyToProcess(); // Check if the process button should be enabled
+    updatePreview();
+    checkIfReadyToProcess();
 }
 
 /**
- * Handles the selection of a text/barcode stamp position.
- * Updates the `selectedPosition` variable and highlights the selected button.
- * Triggers a preview update.
+ * Draws the grid and crosshairs on the position selection canvas.
+ * @param {number} [mouseX] - The current X coordinate of the mouse.
+ * @param {number} [mouseY] - The current Y coordinate of the mouse.
  */
-function handlePositionSelection() {
-    positionButtons.forEach(btn => btn.classList.remove('selected')); // Deselect all position buttons
-    this.classList.add('selected'); // Select the clicked button
-    selectedPosition = this.getAttribute('data-position'); // Get the position from data-attribute
-    // Make the position string more user-friendly for display
-    const friendlyPosition = selectedPosition.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
-    positionValueEl.textContent = `Selected Position: ${friendlyPosition}`; // Update UI with selected position
-    updatePreview(); // Refresh the preview canvas
-    checkIfReadyToProcess(); // Check if the process button should be enabled
+function drawPositionPlane(mouseX, mouseY) {
+    if (!posPlaneCtx) return;
+    const canvas = positionPlane;
+    posPlaneCtx.clearRect(0, 0, canvas.width, canvas.height);
+    posPlaneCtx.fillStyle = 'rgba(224, 224, 224, 0.3)';
+
+    // Draw a grid of dots for visual guidance.
+    const dotRadius = 1.5;
+    const spacingX = canvas.width / 10;
+    const spacingY = canvas.height / 14;
+    for (let i = 1; i < 10; i++) {
+        for (let j = 1; j < 14; j++) {
+            posPlaneCtx.beginPath();
+            posPlaneCtx.arc(i * spacingX, j * spacingY, dotRadius, 0, 2 * Math.PI);
+            posPlaneCtx.fill();
+        }
+    }
+
+    // If mouse coordinates are provided, draw crosshairs.
+    if (typeof mouseX !== 'undefined' && typeof mouseY !== 'undefined') {
+        posPlaneCtx.strokeStyle = 'rgba(224, 224, 224, 0.5)';
+        posPlaneCtx.lineWidth = 1;
+        // Horizontal line
+        posPlaneCtx.beginPath();
+        posPlaneCtx.moveTo(0, mouseY);
+        posPlaneCtx.lineTo(canvas.width, mouseY);
+        posPlaneCtx.stroke();
+        // Vertical line
+        posPlaneCtx.beginPath();
+        posPlaneCtx.moveTo(mouseX, 0);
+        posPlaneCtx.lineTo(mouseX, canvas.height);
+        posPlaneCtx.stroke();
+    }
 }
 
 /**
- * Handles changes in the font size input.
- * Updates `currentFontSize`, validates the value, and refreshes the preview.
- * @param {Event} e - The font size input change event.
+ * Handles clicks on the position selection plane.
+ * Calculates and stores the relative (x, y) coordinates.
+ * @param {Event} e - The 'click' event.
+ */
+function handlePositionPlaneClick(e) {
+    const rect = positionPlane.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    // Normalize coordinates to a 0-1 range.
+    const relativeX = x / positionPlane.clientWidth;
+    const relativeY = y / positionPlane.clientHeight;
+    customPosition = { x: relativeX, y: relativeY };
+
+    // Update the UI to show the selected position in percentages.
+    const percentX = (relativeX * 100).toFixed(1);
+    const percentY = (relativeY * 100).toFixed(1);
+    positionValueEl.textContent = `Selected Position: (${percentX}%, ${percentY}%)`;
+
+    updatePreview();
+    checkIfReadyToProcess();
+}
+
+/**
+ * Handles changes to the font size input.
+ * @param {Event} e - The 'change' event.
  */
 function handleFontSizeChange(e) {
-    currentFontSize = parseInt(e.target.value, 10); // Parse font size to integer
-    // Validate font size within min/max bounds
+    currentFontSize = parseInt(e.target.value, 10);
+    // Basic validation for font size.
     if (isNaN(currentFontSize) || currentFontSize < 10) currentFontSize = 10;
     if (currentFontSize > 100) currentFontSize = 100;
-    e.target.value = currentFontSize; // Update input field to reflect validated value
-    updatePreview(); // Refresh the preview canvas
+    e.target.value = currentFontSize;
+    updatePreview();
 }
 
 /**
- * Handles changes in the text padding input.
- * Updates `currentTextPadding`, validates the value, and refreshes the preview.
- * @param {Event} e - The padding input change event.
+ * Handles changes to the text padding input.
+ * @param {Event} e - The 'change' event.
  */
 function handleTextPaddingChange(e) {
-    currentTextPadding = parseInt(e.target.value, 10); // Parse padding to integer
-    // Validate padding within min/max bounds
+    currentTextPadding = parseInt(e.target.value, 10);
+    // Basic validation for padding.
     if (isNaN(currentTextPadding) || currentTextPadding < 0) currentTextPadding = 0;
     if (currentTextPadding > 50) currentTextPadding = 50;
-    e.target.value = currentTextPadding; // Update input field to reflect validated value
-    updatePreview(); // Refresh the preview canvas
+    e.target.value = currentTextPadding;
+    updatePreview();
 }
 
 /**
- * ADDED: Handles changes in the barcode width slider.
- * Updates `currentBarcodeWidthPercentage` and the display of this value.
- * Refreshes the preview if barcode mode is enabled.
- * @param {Event} e - The input event from the slider.
+ * Handles changes from the barcode width slider.
+ * @param {Event} e - The 'input' event.
  */
 function handleBarcodeWidthSliderChange(e) {
-    currentBarcodeWidthPercentage = parseInt(e.target.value, 10); // Parse width percentage
+    currentBarcodeWidthPercentage = parseInt(e.target.value, 10);
     if (barcodeWidthValueDisplay) {
-        barcodeWidthValueDisplay.textContent = currentBarcodeWidthPercentage; // Update UI display
+        barcodeWidthValueDisplay.textContent = currentBarcodeWidthPercentage;
     }
-    if (isBarcodeEnabled) { // Only update preview if barcode mode is active
-        updatePreview(); // Refresh the preview canvas
+    if (isBarcodeEnabled) {
+        updatePreview();
     }
 }
 
-
 /**
- * ADDED: Handles changes in the barcode's displayed value font size input.
- * NOTE: This function is now largely superseded as `fontSizeInput` controls barcode text font size.
- * It's kept for potential future use if a dedicated input is re-introduced.
- * @param {Event} e - The change event from the input.
+ * Handles changes from the opacity slider.
+ * @param {Event} e - The 'input' event.
  */
-function handleBarcodeValueFontSizeChange(e) {
-    // currentBarcodeValueFontSize = parseInt(e.target.value, 10);
-    // if (isNaN(currentBarcodeValueFontSize) || currentBarcodeValueFontSize < 8) currentBarcodeValueFontSize = 8;
-    // if (currentBarcodeValueFontSize > 40) currentBarcodeValueFontSize = 40; // Adjust max as needed
-    // e.target.value = currentBarcodeValueFontSize;
-    // if (isBarcodeEnabled) {
-    //     updatePreview();
-    // }
+function handleOpacityChange(e) {
+    const opacityPercentage = parseInt(e.target.value, 10);
+    currentOpacity = opacityPercentage / 100;
+    if (opacityValueDisplay) {
+        opacityValueDisplay.textContent = opacityPercentage;
+    }
+    updatePreview();
 }
 
 /**
- * Handles changes in the barcode checkbox state.
- * Toggles barcode mode (`isBarcodeEnabled`), updates UI elements accordingly (e.g., disables/enables font size input,
- * shows/hides barcode width slider, updates font size label), and refreshes the preview.
- * @param {Event} e - The change event from the barcode checkbox.
+ * Handles the barcode checkbox state change.
+ * Toggles UI elements related to barcode settings.
+ * @param {Event} e - The 'change' event.
  */
 function handleBarcodeCheckboxChange(e) {
-    isBarcodeEnabled = e.target.checked; // Update barcode mode state
+    isBarcodeEnabled = e.target.checked;
+    const fontSizeInputLabel = document.querySelector('label[for="font-size-input"]');
 
     if (isBarcodeEnabled) {
-        barcodeStatusEl.textContent = 'Barcode (CODE128) will be used.'; // Set status message
-        if (fontSizeInput) {
-            fontSizeInput.disabled = false; // Ensure main font size input is enabled
-            // Update title to reflect it now also controls barcode value font size
-            fontSizeInput.title = "Controls font size for the value displayed with the barcode, or for plain text.";
-        }
-        if (fontSizeInputLabel) { // If the label element exists
-            // Update the label text to be more descriptive for barcode mode
-            fontSizeInputLabel.textContent = "Font Size (px) (for barcode value / text):";
-        }
-
-        // Show and enable barcode width slider
+        barcodeStatusEl.textContent = 'Barcode (CODE128) will be used.';
+        if (fontSizeInputLabel) fontSizeInputLabel.textContent = "Font Size (px) (for barcode value):";
         if (barcodeWidthSliderGroup) barcodeWidthSliderGroup.style.display = 'block';
         if (barcodeWidthSlider) barcodeWidthSlider.disabled = false;
-
-        // ADDED: Hide and disable the dedicated barcode value font size input as it's superseded by the main one
-        if (barcodeValueFontSizeGroup) barcodeValueFontSizeGroup.style.display = 'none';
-        if (barcodeValueFontSizeInput) barcodeValueFontSizeInput.disabled = true;
-
-    } else { // Barcode mode is disabled
-        barcodeStatusEl.textContent = ''; // Clear barcode status message
-        if (fontSizeInput) {
-            fontSizeInput.disabled = false; // Main font size input remains enabled for text
-            fontSizeInput.title = "Controls font size for plain text."; // Revert title
-        }
-        if (fontSizeInputLabel) { // If the label element exists
-            // Revert the label text to its default for text-only mode
-            fontSizeInputLabel.textContent = "Font Size (px) (for text only):";
-        }
-
-        // Hide and disable barcode width slider
+    } else {
+        barcodeStatusEl.textContent = '';
+        if (fontSizeInputLabel) fontSizeInputLabel.textContent = "Font Size (px):";
         if (barcodeWidthSliderGroup) barcodeWidthSliderGroup.style.display = 'none';
         if (barcodeWidthSlider) barcodeWidthSlider.disabled = true;
-
-        // ADDED: Ensure dedicated barcode value font size input remains hidden/disabled
-        if (barcodeValueFontSizeGroup) barcodeValueFontSizeGroup.style.display = 'none';
-        if (barcodeValueFontSizeInput) barcodeValueFontSizeInput.disabled = true;
     }
-    updatePreview(); // Refresh the preview canvas to reflect changes
+    // The font size input remains enabled in both cases, but its label changes.
+    if (fontSizeInput) {
+        fontSizeInput.disabled = false;
+        fontSizeInput.title = isBarcodeEnabled ?
+            "Controls font size for the value displayed with the barcode." :
+            "Controls font size for plain text.";
+    }
+    updatePreview();
 }
 
 
 /**
- * Loads an image file for the preview canvas.
- * Reads the file as a Data URL, creates an Image object, and scales it for preview.
+ * Loads a single image file for the preview canvas.
  * @param {File} file - The image file to load.
  */
 function loadImageForPreview(file) {
-    const reader = new FileReader(); // Create a FileReader to read the file content
-    reader.onload = function(event) { // Called when file reading is complete
-        const img = new Image(); // Create a new Image object
-        img.onload = function() { // Called when the image data has been loaded
-            let newWidth = img.width; // Original image width
-            let newHeight = img.height; // Original image height
-            const parentElement = previewCanvas.parentElement; // Get parent for responsive sizing
-            // Determine max width for preview, fallback if parent has no clientWidth
+    const reader = new FileReader();
+    reader.onload = function(event) {
+        const img = new Image();
+        img.onload = function() {
+            // Calculate the dimensions for the preview display, constraining it to a max width/height.
+            let newWidth = img.width;
+            let newHeight = img.height;
+            const parentElement = previewCanvas.parentElement;
             const maxWidth = parentElement && parentElement.clientWidth > 0 ? parentElement.clientWidth * 0.9 : 600;
-            const maxHeight = 400; // Fixed max height for preview area
+            const maxHeight = 400;
 
-            // Scale image to fit within maxWidth, maintaining aspect ratio
             if (newWidth > maxWidth) {
                 newHeight = (maxWidth / newWidth) * newHeight;
                 newWidth = maxWidth;
             }
-            // Further scale if height still exceeds maxHeight, maintaining aspect ratio
             if (newHeight > maxHeight) {
                 newWidth = (maxHeight / newHeight) * newWidth;
                 newHeight = maxHeight;
             }
-            img.actualPreviewRenderWidth = newWidth; // Store calculated width for rendering on canvas
-            previewCanvas.loadedImageObject = img; // Cache the loaded Image object on the canvas element
-            updatePreview(); // Call updatePreview to draw with the new image
+
+            // Store the calculated preview width on the image object itself for later use.
+            img.actualPreviewRenderWidth = newWidth;
+            // Store the loaded image object on the canvas element for easy access.
+            previewCanvas.loadedImageObject = img;
+            updatePreview();
         };
-        img.onerror = function() { // Called if there's an error loading the image
+        img.onerror = function() {
             console.error("Error loading image for preview.");
-            previewCanvas.style.display = 'none'; // Hide preview canvas
-            previewCanvas.loadedImageObject = null; // Clear cached image on error
+            previewCanvas.style.display = 'none';
+            previewCanvas.loadedImageObject = null;
         }
-        img.src = event.target.result; // Set image source to the file's Data URL
+        img.src = event.target.result; // Set the image source to the data URL.
     };
-    reader.readAsDataURL(file); // Read the file as a Data URL
+    reader.readAsDataURL(file);
 }
 
 /**
- * Updates the preview canvas.
- * If no base image is loaded, it attempts to load one or hides the canvas.
- * Otherwise, it calls `drawPreviewCanvas` to redraw.
+ * Main function to update the preview canvas.
+ * It clears and redraws the canvas with the base image and the stamp element.
  */
 function updatePreview() {
-    const baseImage = previewCanvas.loadedImageObject; // Get the cached Image object
-
-    if (!baseImage) { // If no image is currently loaded for preview
-        // Attempt to load the first selected image if available and not already loaded
+    const baseImage = previewCanvas.loadedImageObject;
+    if (!baseImage) {
+        // If there's no loaded image, try to load one if files are selected.
         if (selectedImages.length > 0 && !previewCanvas.loadedImageObject) {
             loadImageForPreview(selectedImages[0]);
-        } else { // No images to load, or an error occurred
-            previewCanvas.style.display = 'none'; // Hide the canvas
+        } else {
+            // Otherwise, ensure the canvas is hidden and cleared.
+            previewCanvas.style.display = 'none';
             const ctx = previewCanvas.getContext('2d');
-            if (ctx) { // If context exists, clear it
+            if (ctx) {
                 ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
             }
         }
-        return; // Exit if no base image
-    }
-    
-    if (!previewCanvas.getContext) { // Check if canvas 2D context is supported/available
-        console.error("Canvas context not available for preview.");
-        previewCanvas.style.display = 'none'; // Hide canvas if context is missing
         return;
     }
-    
-    drawPreviewCanvas(baseImage); // Proceed to draw on the canvas
+    if (!previewCanvas.getContext) {
+        console.error("Canvas context not available for preview.");
+        previewCanvas.style.display = 'none';
+        return;
+    }
+    drawPreviewCanvas(baseImage);
 }
 
+
 /**
- * Draws the base image and the text/barcode stamp onto the preview canvas.
- * @param {Image} baseImage - The loaded Image object to use as the background.
+ * Draws the base image and the stamp overlay on the preview canvas.
+ * @param {Image} baseImage - The loaded image object to draw.
  */
 function drawPreviewCanvas(baseImage) {
-    previewCanvas.style.display = 'block'; // Ensure canvas is visible
-    const ctx = previewCanvas.getContext('2d'); // Get 2D rendering context
-    
-    // Calculate display dimensions for the preview, maintaining aspect ratio
-    // based on the stored `actualPreviewRenderWidth`
+    previewCanvas.style.display = 'block';
+    const ctx = previewCanvas.getContext('2d');
+
+    // Set the canvas dimensions based on the preview size calculated earlier.
     const canvasDisplayWidth = baseImage.actualPreviewRenderWidth;
     const canvasDisplayHeight = (canvasDisplayWidth / baseImage.width) * baseImage.height;
-
-    // Set the canvas internal (buffer) resolution
     previewCanvas.width = canvasDisplayWidth;
     previewCanvas.height = canvasDisplayHeight;
-    
-    ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height); // Clear previous drawing
-    ctx.drawImage(baseImage, 0, 0, previewCanvas.width, previewCanvas.height); // Draw the base image scaled to fit
 
-    // Only draw the stamp element if text and position are selected
-    if (userText && selectedPosition) {
-        // Pass currentFontSize as the font size for barcode value text.
-        // Also pass STAMP_CORNER_RADIUS for the rounded background.
-        drawElement(ctx, userText, selectedPosition, previewCanvas.width, previewCanvas.height, currentFontSize, currentTextPadding, isBarcodeEnabled, currentBarcodeWidthPercentage, previewCanvas.width, STAMP_CORNER_RADIUS);
+    ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+    ctx.drawImage(baseImage, 0, 0, previewCanvas.width, previewCanvas.height);
+
+    // Only draw the stamp if there is text and a position has been selected.
+    if (userText && customPosition) {
+        // The `position` argument is no longer used by drawElement, so we pass null.
+        drawElement(ctx, userText, null, previewCanvas.width, previewCanvas.height, currentFontSize, currentTextPadding, isBarcodeEnabled, currentBarcodeWidthPercentage, previewCanvas.width, STAMP_CORNER_RADIUS);
     }
 }
 
-// --- MODULAR DRAW FUNCTIONS START ---
-
 /**
- * NEW: Generates a barcode or measures text to get content dimensions.
- * @param {CanvasRenderingContext2D} ctx - The canvas 2D rendering context (for text measurement).
- * @param {string} data - The text or barcode data.
- * @param {boolean} shouldDrawBarcode - True to generate a barcode, false to measure text.
- * @param {number} textFontSize - The font size for text or barcode value.
- * @param {number} barcodeTargetWidthPercent - Percentage of the baseImageActualWidth for the barcode.
- * @param {number} baseImageActualWidth - The actual width of the source image (for barcode percentage calculation).
- * @returns {object} An object with { actualContentWidth, actualContentHeight, contentElement (barcode canvas or null), error, errorMsg }
+ * Calculates the dimensions of the content (text or barcode).
+ * @param {CanvasRenderingContext2D} ctx - The canvas context.
+ * @param {string} data - The text data.
+ * @param {boolean} shouldDrawBarcode - Flag to indicate if it's a barcode.
+ * @param {number} textFontSize - The font size for text.
+ * @param {number} barcodeTargetWidthPercent - The target width percentage for the barcode.
+ * @param {number} baseImageActualWidth - The actual width of the image being processed.
+ * @returns {object} An object containing the content's width, height, and the barcode canvas element if applicable.
  */
 function getContentDetails(ctx, data, shouldDrawBarcode, textFontSize, barcodeTargetWidthPercent, baseImageActualWidth) {
     let actualContentWidth, actualContentHeight;
-    let contentElement = null; // Will hold the barcode canvas if applicable
+    let contentElement = null; // Will hold the canvas for the barcode.
     let error = false;
     let errorMsg = "";
 
     if (shouldDrawBarcode) {
+        // Ensure the percentage is within a reasonable range.
         let targetPercentage = barcodeTargetWidthPercent;
-        if (targetPercentage <= 0) targetPercentage = 5; // Default to 5% if 0 or less
-        else if (targetPercentage < 5) targetPercentage = 5; // Min 5%
+        if (targetPercentage <= 0) targetPercentage = 5;
+        else if (targetPercentage < 5) targetPercentage = 5;
 
+        // Calculate the target pixel width based on the percentage of the full-size image.
         const targetBarcodePixelWidth = baseImageActualWidth * (targetPercentage / 100);
+
+        // Create a temporary canvas to generate the barcode.
         const tempBarcodeCanvas = document.createElement('canvas');
         try {
             JsBarcode(tempBarcodeCanvas, data, {
                 format: "CODE128",
                 lineColor: "#000000",
-                width: 2, // Nominal bar width
-                height: 50, // Nominal bar height
-                displayValue: true,
+                width: 2, // Base width of barcode lines
+                height: 50, // Base height
+                displayValue: true, // Show text value below barcode
                 fontSize: textFontSize,
                 margin: 5
             });
             if (tempBarcodeCanvas.width === 0) throw new Error("JsBarcode rendered zero-width canvas.");
 
+            // Scale the generated barcode to the target width.
             const sourceBarcodeWidth = tempBarcodeCanvas.width;
             const sourceBarcodeHeight = tempBarcodeCanvas.height;
             const scaleFactor = targetBarcodePixelWidth / sourceBarcodeWidth;
-            
             actualContentWidth = targetBarcodePixelWidth;
             actualContentHeight = sourceBarcodeHeight * scaleFactor;
-            contentElement = tempBarcodeCanvas; // Store the generated barcode canvas
+            contentElement = tempBarcodeCanvas;
 
+            // Ensure dimensions are not too small.
             if (actualContentWidth < 10) actualContentWidth = 10;
             if (actualContentHeight < 10) actualContentHeight = 10;
+
         } catch (e) {
+            // Handle errors during barcode generation.
             console.error("Barcode generation error in getContentDetails:", e.message, "Data:", data);
             error = true;
             errorMsg = "Barcode Error";
-            // Provide fallback dimensions for the error message itself
-            ctx.font = `bold 16px Arial`; // Use a fixed font for error message measurement
+            ctx.font = `bold 16px Arial`;
             actualContentWidth = ctx.measureText(errorMsg).width;
-            actualContentHeight = 16; // Approximate height for 16px text
+            actualContentHeight = 16;
         }
-    } else { // Plain text
+    } else {
+        // For plain text, measure its width and height.
         ctx.font = `bold ${textFontSize}px Arial`;
         const textMetrics = ctx.measureText(data);
         actualContentWidth = textMetrics.width;
@@ -377,469 +393,422 @@ function getContentDetails(ctx, data, shouldDrawBarcode, textFontSize, barcodeTa
     return { actualContentWidth, actualContentHeight, contentElement, error, errorMsg };
 }
 
-/**
- * NEW: Calculates the X and Y coordinates for the stamp element.
- * @param {string} position - The selected position (e.g., 'top-left').
- * @param {number} imageDisplayWidth - The width of the canvas.
- * @param {number} imageDisplayHeight - The height of the canvas.
- * @param {number} stampWidth - The total width of the stamp (content + padding).
- * @param {number} stampHeight - The total height of the stamp (content + padding).
- * @param {number} marginX - The horizontal margin from the canvas edge.
- * @param {number} marginY - The vertical margin from the canvas edge.
- * @returns {object} An object with { elementX, elementY }.
- */
-function calculateStampCoordinates(position, imageDisplayWidth, imageDisplayHeight, stampWidth, stampHeight, marginX, marginY) {
-    let elementX, elementY;
-
-    if (position.includes('left')) elementX = marginX;
-    else if (position.includes('right')) elementX = imageDisplayWidth - stampWidth - marginX;
-    else elementX = (imageDisplayWidth - stampWidth) / 2; // Center X
-
-    if (position.includes('top')) elementY = marginY;
-    else if (position.includes('bottom')) elementY = imageDisplayHeight - stampHeight - marginY;
-    else elementY = (imageDisplayHeight - stampHeight) / 2; // Center Y
-    
-    if (position === 'center') { // Explicit center overrides
-        elementX = (imageDisplayWidth - stampWidth) / 2;
-        elementY = (imageDisplayHeight - stampHeight) / 2;
-    }
-    return { elementX, elementY };
-}
 
 /**
- * Draws a rounded rectangle path using the current state of the canvas.
- * This function defines the path but does not fill or stroke it.
- * @param {CanvasRenderingContext2D} ctx - The canvas 2D rendering context.
- * @param {number} x - The top-left x-coordinate of the rectangle.
- * @param {number} y - The top-left y-coordinate of the rectangle.
+ * A utility function to draw a rectangle with rounded corners.
+ * @param {CanvasRenderingContext2D} ctx - The canvas context.
+ * @param {number} x - The top-left x-coordinate.
+ * @param {number} y - The top-left y-coordinate.
  * @param {number} width - The width of the rectangle.
  * @param {number} height - The height of the rectangle.
- * @param {number} radius - The corner radius. If too large, it's adjusted to fit.
+ * @param {number} radius - The corner radius.
  */
 function roundRect(ctx, x, y, width, height, radius) {
-  // Adjust radius if it's too large for the dimensions
-  if (width < 2 * radius) radius = width / 2;
-  if (height < 2 * radius) radius = height / 2;
-  
-  ctx.beginPath(); // Start a new path
-  ctx.moveTo(x + radius, y); // Move to the start of the top-left arc
-  // Draw lines and arcs for the rounded corners
-  ctx.arcTo(x + width, y,   x + width, y + height, radius); // Top-right corner
-  ctx.arcTo(x + width, y + height, x, y + height, radius); // Bottom-right corner
-  ctx.arcTo(x,   y + height, x, y,   radius); // Bottom-left corner
-  ctx.arcTo(x,   y,   x + width, y,   radius); // Top-left corner
-  ctx.closePath(); // Close the path, connecting the last point to the first
+    if (width < 2 * radius) radius = width / 2;
+    if (height < 2 * radius) radius = height / 2;
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.arcTo(x + width, y, x + width, y + height, radius);
+    ctx.arcTo(x + width, y + height, x, y + height, radius);
+    ctx.arcTo(x, y + height, x, y, radius);
+    ctx.arcTo(x, y, x + width, y, radius);
+    ctx.closePath();
 }
 
 /**
- * NEW: Draws the background for the stamp.
- * @param {CanvasRenderingContext2D} ctx - The canvas 2D rendering context.
- * @param {number} x - The top-left x-coordinate of the stamp background.
- * @param {number} y - The top-left y-coordinate of the stamp background.
- * @param {number} width - The width of the stamp background.
- * @param {number} height - The height of the stamp background.
- * @param {number} cornerRadius - The corner radius for the background.
- * @param {string} fillStyle - The fill style for the background.
- * @param {string} strokeStyle - The stroke style for the background border.
- * @param {number} lineWidth - The line width for the background border.
+ * Draws the white, rounded-corner background for the stamp.
+ * @param {CanvasRenderingContext2D} ctx - The canvas context.
+ * @param {number} x - The top-left x-coordinate of the background.
+ * @param {number} y - The top-left y-coordinate of the background.
+ * @param {number} width - The width of the background.
+ * @param {number} height - The height of the background.
+ * @param {number} cornerRadius - The corner radius.
+ * @param {string} fillStyle - The fill color.
+ * @param {string} strokeStyle - The stroke color.
+ * @param {number} lineWidth - The width of the stroke.
  */
 function drawStampBackground(ctx, x, y, width, height, cornerRadius, fillStyle, strokeStyle, lineWidth) {
     ctx.fillStyle = fillStyle;
     ctx.strokeStyle = strokeStyle;
     ctx.lineWidth = lineWidth;
-
-    roundRect(ctx, x, y, width, height, cornerRadius); // Create the rounded path
-    ctx.fill();   // Fill the path
-    ctx.stroke(); // Stroke the path (draw the border)
+    roundRect(ctx, x, y, width, height, cornerRadius);
+    ctx.fill();
+    ctx.stroke();
 }
 
+
 /**
- * NEW: Draws the actual content (text or barcode) onto the stamp.
- * @param {CanvasRenderingContext2D} ctx - The canvas 2D rendering context.
- * @param {string} data - The text data (used if not drawing a barcode from contentElement).
- * @param {boolean} shouldDrawBarcode - True if drawing a barcode.
- * @param {HTMLCanvasElement | null} barcodeElement - The pre-rendered barcode canvas, or null for text.
- * @param {number} drawX - The x-coordinate to start drawing the content.
- * @param {number} drawY - The y-coordinate to start drawing the content.
- * @param {number} contentWidth - The width of the content to draw.
- * @param {number} contentHeight - The height of the content to draw.
- * @param {number} textFontSize - Font size for text.
- * @param {number} stampElementX - The X coordinate of the overall stamp background (for text centering).
- * @param {number} stampElementWidth - The width of the overall stamp background (for text centering).
- * @param {number} stampElementY - The Y coordinate of the overall stamp background (for text centering).
- * @param {number} stampElementHeight - The height of the overall stamp background (for text centering).
+ * Draws the actual content (text or barcode) onto the stamp background.
+ * @param {CanvasRenderingContext2D} ctx - The main canvas context.
+ * @param {string} data - The text data.
+ * @param {boolean} shouldDrawBarcode - Flag indicating if content is a barcode.
+ * @param {HTMLCanvasElement} barcodeElement - The canvas element with the generated barcode.
+ * @param {number} drawX - The x-coordinate for drawing the content.
+ * @param {number} drawY - The y-coordinate for drawing the content.
+ * @param {number} contentWidth - The width of the content.
+ * @param {number} contentHeight - The height of the content.
+ * @param {number} textFontSize - Font size for plain text.
+ * @param {number} stampElementX - The top-left x-coordinate of the entire stamp.
+ * @param {number} stampElementWidth - The total width of the stamp.
+ * @param {number} stampElementY - The top-left y-coordinate of the entire stamp.
+ * @param {number} stampElementHeight - The total height of the stamp.
  */
 function drawStampContent(ctx, data, shouldDrawBarcode, barcodeElement, drawX, drawY, contentWidth, contentHeight, textFontSize, stampElementX, stampElementWidth, stampElementY, stampElementHeight) {
     if (shouldDrawBarcode && barcodeElement) {
+        // Draw the barcode image onto the canvas if it was successfully generated.
         if (barcodeElement.width > 0 && barcodeElement.height > 0) {
             ctx.drawImage(barcodeElement, drawX, drawY, contentWidth, contentHeight);
         }
-    } else if (!shouldDrawBarcode) { // Plain text
-        ctx.fillStyle = '#000000'; // Black text color
-        ctx.font = `bold ${textFontSize}px Arial`; // Ensure font is set for drawing
+    } else if (!shouldDrawBarcode) {
+        // For plain text, set properties and draw it centered within the stamp.
+        ctx.fillStyle = '#000000';
+        ctx.font = `bold ${textFontSize}px Arial`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        // Calculate center for text fill based on the padded element box
         const textDrawCenterX = stampElementX + stampElementWidth / 2;
         const textDrawCenterY = stampElementY + stampElementHeight / 2;
         ctx.fillText(data, textDrawCenterX, textDrawCenterY);
     }
 }
 
-// --- MODULAR DRAW FUNCTIONS END ---
-
-
 /**
- * REFACTORED: Draws either a text stamp or a barcode onto the provided canvas context.
- * This function now orchestrates calls to modular helper functions.
- * @param {CanvasRenderingContext2D} ctx - The canvas 2D rendering context.
+ * Main drawing function that orchestrates the creation of the stamp element on a canvas.
+ * @param {CanvasRenderingContext2D} ctx - The context of the canvas to draw on.
  * @param {string} data - The text or barcode data.
- * @param {string} position - The selected position (e.g., 'top-left').
- * @param {number} imageDisplayWidth - The width of the canvas area where the image is currently displayed.
- * @param {number} imageDisplayHeight - The height of the canvas area where the image is currently displayed.
- * @param {number} mainTextFontSize - The font size (used for text mode, AND NOW for barcode value).
- * @param {number} padding - The padding around the element (text or barcode).
- * @param {boolean} drawBarcodeFlag - True to draw a barcode, false to draw text. (Renamed from drawBarcode to avoid conflict)
- * @param {number} barcodeWidthPercent - Percentage of the imageDisplayWidth for the barcode.
- * @param {number} baseImageActualWidth - The actual width of the source image (for barcode percentage calculation).
- * @param {number} cornerRadius - The radius for the stamp's rounded corners.
+ * @param {object} position - This argument is deprecated and no longer used.
+ * @param {number} imageDisplayWidth - The width of the image area on the canvas.
+ * @param {number} imageDisplayHeight - The height of the image area on the canvas.
+ * @param {number} mainTextFontSize - The font size for the text.
+ * @param {number} padding - The padding for the stamp.
+ * @param {boolean} drawBarcodeFlag - Whether to draw a barcode.
+ * @param {number} barcodeWidthPercent - The width percentage for the barcode.
+ * @param {number} baseImageActualWidth - The original width of the image.
+ * @param {number} cornerRadius - The corner radius for the stamp background.
  */
 function drawElement(ctx, data, position, imageDisplayWidth, imageDisplayHeight, mainTextFontSize, padding, drawBarcodeFlag, barcodeWidthPercent, baseImageActualWidth, cornerRadius) {
-    // Define margins from the edge of the image/canvas
-    const marginX = Math.max(10, imageDisplayWidth * 0.02);
-    const marginY = Math.max(10, imageDisplayHeight * 0.02);
+    ctx.save(); // Save the current canvas state.
+    ctx.globalAlpha = currentOpacity; // Apply the selected opacity.
 
-    // 1. Get Content Details (dimensions, barcode canvas if applicable, errors)
+    // Get the details (dimensions, etc.) of the content to be drawn.
     const contentDetails = getContentDetails(ctx, data, drawBarcodeFlag, mainTextFontSize, barcodeWidthPercent, baseImageActualWidth);
-    
     let { actualContentWidth, actualContentHeight, contentElement, error, errorMsg } = contentDetails;
 
-    // 2. Handle Barcode Generation Error (if any)
-    if (error && drawBarcodeFlag) { // Only draw error message if it was a barcode attempt that failed
-        const errorStampWidth = actualContentWidth + 2 * padding; // actualContentWidth is now error message width
-        const errorStampHeight = actualContentHeight + 2 * padding; // actualContentHeight is now error message height
-        
-        const { elementX: errorX, elementY: errorY } = calculateStampCoordinates(position, imageDisplayWidth, imageDisplayHeight, errorStampWidth, errorStampHeight, marginX, marginY);
-        
-        // Draw rectangular background for error message (not rounded for simplicity here)
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-        ctx.fillRect(errorX, errorY, errorStampWidth, errorStampHeight);
-        // Draw error text
-        ctx.fillStyle = 'red';
-        ctx.font = `bold 16px Arial`; // Ensure font is set for error message
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(errorMsg, errorX + errorStampWidth / 2, errorY + errorStampHeight / 2);
-        return; // Stop further drawing for this element
-    }
-
-    // 3. Calculate Overall Stamp Dimensions (content + padding)
+    // Calculate the total dimensions of the stamp including padding.
     const stampWidth = actualContentWidth + 2 * padding;
     const stampHeight = actualContentHeight + 2 * padding;
+    let elementX, elementY;
 
-    // 4. Calculate Stamp Position
-    const { elementX, elementY } = calculateStampCoordinates(position, imageDisplayWidth, imageDisplayHeight, stampWidth, stampHeight, marginX, marginY);
+    if (customPosition) {
+        // Calculate the top-left corner of the stamp based on the centered custom position.
+        const centerX = customPosition.x * imageDisplayWidth;
+        const centerY = customPosition.y * imageDisplayHeight;
+        elementX = centerX - (stampWidth / 2);
+        elementY = centerY - (stampHeight / 2);
+        // Ensure the stamp does not go outside the image boundaries.
+        elementX = Math.max(0, Math.min(elementX, imageDisplayWidth - stampWidth));
+        elementY = Math.max(0, Math.min(elementY, imageDisplayHeight - stampHeight));
+    } else {
+        // If no position is set, do nothing.
+        ctx.restore();
+        return;
+    }
 
-    // 5. Draw Stamp Background
-    drawStampBackground(ctx, elementX, elementY, stampWidth, stampHeight, cornerRadius, 'rgba(255, 255, 255, 0.9)', 'rgba(200, 200, 200, 0.9)', 1);
+    // If there was an error generating a barcode, display an error message.
+    if (error && drawBarcodeFlag) {
+        ctx.fillStyle = 'rgb(255, 255, 255)';
+        ctx.fillRect(elementX, elementY, stampWidth, stampHeight);
+        ctx.fillStyle = 'red';
+        ctx.font = `bold 16px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(errorMsg, elementX + stampWidth / 2, elementY + stampHeight / 2);
+        ctx.restore();
+        return;
+    }
 
-    // 6. Draw Stamp Content (Text or Barcode)
+    // Draw the rounded background for the stamp.
+    drawStampBackground(ctx, elementX, elementY, stampWidth, stampHeight, cornerRadius, 'rgb(255, 255, 255)', 'rgb(200, 200, 200)', 1);
+
+    // Calculate the position to draw the content inside the stamp background.
     const contentDrawX = elementX + padding;
     const contentDrawY = elementY + padding;
-    
+
+    // Draw the actual content (text or barcode).
     drawStampContent(ctx, data, drawBarcodeFlag, contentElement, contentDrawX, contentDrawY, actualContentWidth, actualContentHeight, mainTextFontSize, elementX, stampWidth, elementY, stampHeight);
+
+    ctx.restore(); // Restore the canvas state.
 }
 
 
 /**
  * Checks if all required inputs (images, text, position) are provided.
- * @returns {boolean} True if all required inputs are present, false otherwise.
+ * @returns {boolean} - True if all inputs are present, false otherwise.
  */
 function hasRequiredInputs() {
-    return selectedImages.length > 0 && userText.trim() !== '' && selectedPosition;
+    return selectedImages.length > 0 && userText.trim() !== '' && customPosition !== null;
 }
 
 /**
- * Checks if the application is ready to process images and enables/disables the process button.
+ * Enables or disables the "Process Images" button based on input validity.
  */
 function checkIfReadyToProcess() {
-    processButton.disabled = !hasRequiredInputs(); // Disable button if inputs are missing
+    processButton.disabled = !hasRequiredInputs();
 }
 
 /**
- * Processes all selected images: adds the text/barcode stamp and prepares them for download.
- * Updates progress bar and gallery.
+ * Loops through all selected images and applies the stamping effect.
  */
 function processImages() {
-    if (!hasRequiredInputs()) { // Double-check inputs before processing
+    if (!hasRequiredInputs()) {
         alert('Please select images, enter data, and choose a position before processing.');
         return;
     }
-    processedImages = []; // Clear previous results
-    gallery.innerHTML = ''; // Clear gallery display
-    progressContainer.style.display = 'block'; // Show progress bar and text
-    progressBar.value = 0; // Reset progress bar
-    progressTextEl.textContent = `Processing 0/${selectedImages.length} images...`; // Initial progress text
-    let processedCount = 0; // Counter for successfully processed images
-    let errorCount = 0; // Counter for images that failed to process
 
-    // Iterate over each selected file
-    selectedImages.forEach((file, index) => {
+    // Reset state before processing.
+    processedImages = [];
+    gallery.innerHTML = '';
+    progressContainer.style.display = 'block';
+    progressBar.value = 0;
+    progressTextEl.textContent = `Processing 0/${selectedImages.length} images...`;
+
+    let processedCount = 0;
+    let errorCount = 0;
+
+    selectedImages.forEach((file) => {
         const reader = new FileReader();
-        reader.onload = function(event) { // When file is read
+        reader.onload = function(event) {
             const img = new Image();
-            img.onload = function() { // When image data is loaded
-                const tempCanvas = document.createElement('canvas'); // Create a temporary canvas for each image
-                tempCanvas.width = img.naturalWidth; // Set canvas to original image dimensions
+            img.onload = function() {
+                // Create a temporary canvas for each image at its original resolution.
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = img.naturalWidth;
                 tempCanvas.height = img.naturalHeight;
                 const ctx = tempCanvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, tempCanvas.width, tempCanvas.height); // Draw original image on temp canvas
-                
-                // Draw the stamp (text or barcode) onto the temporary canvas
-                // Note: The 10th argument to drawElement was barcodeValFontSize, which is now effectively mainTextFontSize.
-                // The last argument is cornerRadius.
-                drawElement(ctx, userText, selectedPosition, tempCanvas.width, tempCanvas.height, currentFontSize, currentTextPadding, isBarcodeEnabled, currentBarcodeWidthPercentage, img.naturalWidth, STAMP_CORNER_RADIUS); 
-                
-                // Get the processed image as a Data URL (JPEG format)
-                const processedImageDataUrl = tempCanvas.toDataURL('image/jpeg', 0.9); // 0.9 is quality
-                processedImages.push({ name: file.name, dataUrl: processedImageDataUrl }); // Store for ZIP download
-                addImageToGallery(processedImageDataUrl, file.name); // Add to visual gallery on the page
-                
-                processedCount++; // Increment successful count
-                // Calculate total attempts to correctly update progress when errors occur
-                let totalAttempts = processedCount + errorCount;
-                progressBar.value = (totalAttempts / selectedImages.length) * 100; // Update progress bar based on total attempts
-                progressTextEl.textContent = `Processing ${totalAttempts}/${selectedImages.length} images...`;
+                ctx.drawImage(img, 0, 0, tempCanvas.width, tempCanvas.height);
 
+                // Draw the stamp element onto this full-resolution canvas.
+                drawElement(ctx, userText, null, tempCanvas.width, tempCanvas.height, currentFontSize, currentTextPadding, isBarcodeEnabled, currentBarcodeWidthPercentage, img.naturalWidth, STAMP_CORNER_RADIUS);
 
-                // Check if all images have been attempted
-                if (totalAttempts === selectedImages.length) {
-                    if (errorCount > 0) {
-                         progressTextEl.textContent = `Completed. Processed: ${processedCount}/${selectedImages.length}. Errors: ${errorCount}.`;
-                    } else {
-                        progressTextEl.textContent = `Completed processing ${selectedImages.length} images!`;
-                    }
-                    // If download all is checked and there are images processed, trigger download
-                    if (downloadAllCheckbox.checked && processedImages.length > 0) {
-                        downloadAllProcessedImages();
-                    }
-                }
+                // Get the result as a data URL.
+                const processedImageDataUrl = tempCanvas.toDataURL('image/jpeg', 0.9);
+                processedImages.push({ name: file.name, dataUrl: processedImageDataUrl });
+                addImageToGallery(processedImageDataUrl, file.name);
+
+                processedCount++;
+                updateProcessingProgress(processedCount, errorCount);
             };
-            img.onerror = function() { // Handle error loading an image
+            img.onerror = function() {
                 console.error("Error processing image:", file.name);
-                errorCount++; // Increment error count
-                let totalAttempts = processedCount + errorCount;
-                progressTextEl.textContent = `Error processing ${file.name}. (${totalAttempts}/${selectedImages.length})`;
-                progressBar.value = (totalAttempts / selectedImages.length) * 100;
-
-                // Check if all images have been attempted after an error
-                 if (totalAttempts === selectedImages.length) {
-                    if (errorCount === selectedImages.length) {
-                        progressTextEl.textContent = `All ${errorCount} images failed to process.`;
-                    } else {
-                         progressTextEl.textContent = `Completed. Processed: ${processedCount}/${selectedImages.length}. Errors: ${errorCount}.`;
-                    }
-                    if (downloadAllCheckbox.checked && processedImages.length > 0) {
-                        downloadAllProcessedImages();
-                    }
-                }
+                errorCount++;
+                updateProcessingProgress(processedCount, errorCount, file.name);
             }
-            img.src = event.target.result; // Set image source from FileReader result
+            img.src = event.target.result;
         };
-        reader.onerror = function() { // Handle error reading a file
+        reader.onerror = function() {
             console.error("Error reading file:", file.name);
             errorCount++;
-            let totalAttempts = processedCount + errorCount;
-            progressTextEl.textContent = `Error reading ${file.name}. (${totalAttempts}/${selectedImages.length})`;
-            progressBar.value = (totalAttempts / selectedImages.length) * 100;
-
-            // Check if all images have been attempted after a file read error
-            if (totalAttempts === selectedImages.length) {
-                 if (errorCount === selectedImages.length) {
-                        progressTextEl.textContent = `All ${errorCount} images failed to load.`;
-                    } else {
-                        progressTextEl.textContent = `Completed. Processed: ${processedCount}/${selectedImages.length}. Errors: ${errorCount}.`;
-                    }
-                if (downloadAllCheckbox.checked && processedImages.length > 0) {
-                    downloadAllProcessedImages();
-                }
-            }
+            updateProcessingProgress(processedCount, errorCount, file.name);
         };
-        reader.readAsDataURL(file); // Start reading the file
+        reader.readAsDataURL(file);
     });
 }
 
 /**
- * Adds a processed image thumbnail and a download button to the gallery display.
- * @param {string} dataUrl - The Data URL of the processed image.
- * @param {string} fileName - The original name of the image file.
+ * REFACTORED HELPER FUNCTION
+ * Updates the progress bar and text during image processing.
+ * This function centralizes the logic for updating progress from both success and error handlers.
+ * @param {number} processedCount - The number of successfully processed images.
+ * @param {number} errorCount - The number of images that failed to process.
+ * @param {string} [errorFileName] - The name of the file that caused an error, if any.
+ */
+function updateProcessingProgress(processedCount, errorCount, errorFileName = '') {
+    const totalAttempts = processedCount + errorCount;
+    const totalImages = selectedImages.length;
+
+    // Update progress bar
+    progressBar.value = (totalAttempts / totalImages) * 100;
+
+    // Update progress text
+    if (errorFileName) {
+        progressTextEl.textContent = `Error processing ${errorFileName}. (${totalAttempts}/${totalImages})`;
+    } else {
+        progressTextEl.textContent = `Processing ${totalAttempts}/${totalImages} images...`;
+    }
+
+    // Check if processing is complete
+    if (totalAttempts === totalImages) {
+        if (errorCount > 0) {
+            progressTextEl.textContent = `Completed. Processed: ${processedCount}/${totalImages}. Errors: ${errorCount}.`;
+        } else {
+            progressTextEl.textContent = `Completed processing ${totalImages} images!`;
+        }
+        // If the "Download All" checkbox is checked, trigger the download.
+        if (downloadAllCheckbox.checked && processedImages.length > 0) {
+            downloadAllProcessedImages();
+        }
+    }
+}
+
+
+/**
+ * Adds a processed image to the gallery section of the page.
+ * @param {string} dataUrl - The data URL of the processed image.
+ * @param {string} fileName - The original name of the file.
  */
 function addImageToGallery(dataUrl, fileName) {
-    const container = document.createElement('div'); // Create container for image and button
+    const container = document.createElement('div');
     container.className = 'result-image-container';
 
-    const imgEl = document.createElement('img'); // Create image element
+    const imgEl = document.createElement('img');
     imgEl.src = dataUrl;
     imgEl.className = 'result-image';
     imgEl.alt = `Processed: ${fileName}`;
-    imgEl.title = fileName; // Show original filename on hover
+    imgEl.title = fileName;
 
-    const downloadBtn = document.createElement('a'); // Create download link
+    const downloadBtn = document.createElement('a');
     downloadBtn.href = dataUrl;
-    // Sanitize filename for download attribute (remove special chars, keep extension)
+    // Sanitize the filename for the download attribute.
     const safeBaseName = fileName.substring(0, fileName.lastIndexOf('.')).replace(/[^\w\s-]/gi, '') || 'image';
-    downloadBtn.download = `${safeBaseName}_stamped.jpg`; // Set download filename
+    downloadBtn.download = `${safeBaseName}_stamped.jpg`;
     downloadBtn.textContent = 'Download';
     downloadBtn.className = 'download-btn';
 
-    container.appendChild(imgEl); // Add image to container
-    container.appendChild(downloadBtn); // Add download button to container
-    gallery.appendChild(container); // Add container to the main gallery
+    container.appendChild(imgEl);
+    container.appendChild(downloadBtn);
+    gallery.appendChild(container);
 }
 
 /**
- * Compiles all processed images into a ZIP archive and initiates download.
- * Uses JSZip and FileSaver.js libraries.
+ * Zips all processed images and initiates a download using JSZip and FileSaver.js.
  */
 function downloadAllProcessedImages() {
-    // Check if required libraries are loaded
     if (typeof JSZip === 'undefined' || typeof saveAs === 'undefined') {
         console.error('JSZip or FileSaver libraries not loaded.');
-        alert('Required libraries for ZIP download are missing.'); // Notify user
+        alert('Required libraries for ZIP download are missing.');
         progressTextEl.textContent = `Error: ZIP libraries not loaded. Download manually.`;
         return;
     }
-    if (processedImages.length === 0) { // Check if there are any images to download
+    if (processedImages.length === 0) {
         progressTextEl.textContent = 'No images were successfully processed to download.';
         return;
     }
+
     progressTextEl.textContent = `Creating ZIP archive with ${processedImages.length} images...`;
-    const zip = new JSZip(); // Initialize JSZip
-    // Add each processed image to the ZIP
+    const zip = new JSZip();
+
     processedImages.forEach((image) => {
-        const imageData = image.dataUrl.replace(/^data:image\/(jpeg|png);base64,/, ""); // Strip base64 prefix
-        // Sanitize filename for ZIP entry
+        // Extract the base64 data from the data URL.
+        const imageData = image.dataUrl.replace(/^data:image\/(jpeg|png);base64,/, "");
         const safeBaseName = image.name.substring(0, image.name.lastIndexOf('.')).replace(/[^\w\s-]/gi, '') || 'image';
-        zip.file(`${safeBaseName}_stamped.jpg`, imageData, { base64: true }); // Add file to zip
+        zip.file(`${safeBaseName}_stamped.jpg`, imageData, { base64: true });
     });
-    // Generate the ZIP file asynchronously
+
     zip.generateAsync({ type: "blob" })
-        .then(function(content) { // When ZIP generation is complete
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-'); // Create a unique filename for the zip
-            saveAs(content, `textstamped_images_${timestamp}.zip`); // Trigger download using FileSaver.js
+        .then(function(content) {
+            // Create a timestamp for a unique zip file name.
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            saveAs(content, `textstamped_images_${timestamp}.zip`);
             progressTextEl.textContent = `ZIP file with ${processedImages.length} images downloaded.`;
         })
-        .catch(function(error) { // Handle errors during ZIP generation
+        .catch(function(error) {
             console.error('Error creating ZIP file:', error);
             progressTextEl.textContent = `Error creating ZIP file. See console. Try downloading manually.`;
         });
 }
 
+
 /**
- * Resets the entire application state to its initial defaults.
- * Clears selected images, text, position, UI elements, and progress.
+ * Resets the entire application state and UI to its initial default values.
  */
 function resetApp() {
-    // Reset global state variables
+    // Reset all global state variables
     selectedImages = [];
     processedImages = [];
     userText = '';
-    selectedPosition = null;
+    customPosition = null;
     isBarcodeEnabled = false;
-    currentBarcodeWidthPercentage = 20; // Reset to default
-    currentFontSize = 24; // Reset to default
-    currentTextPadding = 10; // Reset to default
+    currentBarcodeWidthPercentage = 20;
+    currentOpacity = 0.9;
+    currentFontSize = 24;
+    currentTextPadding = 10;
 
-    // Reset DOM elements values and states
-    if (imageInput) imageInput.value = ''; // Clear file input selection
+    // Reset UI elements
+    if (imageInput) imageInput.value = '';
     if (textInput) textInput.value = '';
     if (fontSizeInput) {
         fontSizeInput.value = currentFontSize;
-        fontSizeInput.disabled = false; // Re-enable
-        fontSizeInput.title = "Controls font size for plain text."; // Reset title
-    }
-    if (fontSizeInputLabel) { // Reset label text for main font size input
-        fontSizeInputLabel.textContent = "Font Size (px) (for text only):";
+        fontSizeInput.disabled = false;
+        fontSizeInput.title = "Controls font size for plain text.";
     }
     if (textPaddingInput) textPaddingInput.value = currentTextPadding;
-
-    // Reset barcode specific controls
+    if (opacitySlider) opacitySlider.value = currentOpacity * 100;
+    if (opacityValueDisplay) opacityValueDisplay.textContent = currentOpacity * 100;
     if (barcodeWidthSlider) {
         barcodeWidthSlider.value = currentBarcodeWidthPercentage;
-        barcodeWidthSlider.disabled = true; // Disable by default
+        barcodeWidthSlider.disabled = true;
     }
     if (barcodeWidthValueDisplay) barcodeWidthValueDisplay.textContent = currentBarcodeWidthPercentage;
-    if (barcodeWidthSliderGroup) barcodeWidthSliderGroup.style.display = 'none'; // Hide
-
-    // Reset and hide the dedicated barcode font size input if it exists
-    if (barcodeValueFontSizeInput) {
-        // barcodeValueFontSizeInput.value = 16; // Default if it were used
-        barcodeValueFontSizeInput.disabled = true;
-    }
-    if (barcodeValueFontSizeGroup) barcodeValueFontSizeGroup.style.display = 'none';
-
-    // Reset UI text indicators
+    if (barcodeWidthSliderGroup) barcodeWidthSliderGroup.style.display = 'none';
     if (imageCountEl) imageCountEl.textContent = '';
     if (textInputStatusEl) textInputStatusEl.textContent = '';
     if (positionValueEl) positionValueEl.textContent = 'Selected Position: None';
-    if (barcodeCheckbox) barcodeCheckbox.checked = false; // Uncheck barcode option
+    if (barcodeCheckbox) barcodeCheckbox.checked = false;
     if (barcodeStatusEl) barcodeStatusEl.textContent = '';
 
-    // Reset position buttons selection
-    if (positionButtons) positionButtons.forEach(btn => btn.classList.remove('selected'));
+    drawPositionPlane(); // Redraw the position plane (clears it)
 
-    // Reset progress display and gallery
     if (progressContainer) progressContainer.style.display = 'none';
     if (progressBar) progressBar.value = 0;
-    if (progressTextEl) progressTextEl.textContent = 'Processing...'; // Default progress text
-    if (gallery) gallery.innerHTML = ''; // Clear gallery
-
-    // Reset preview canvas
+    if (progressTextEl) progressTextEl.textContent = 'Processing...';
+    if (gallery) gallery.innerHTML = '';
     if (previewCanvas) {
         const ctx = previewCanvas.getContext('2d');
-        if (ctx) ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height); // Clear canvas
-        previewCanvas.style.display = 'none'; // Hide preview
-        previewCanvas.loadedImageObject = null; // Clear cached image object
+        if (ctx) ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+        previewCanvas.style.display = 'none';
+        previewCanvas.loadedImageObject = null;
     }
-    
-    if (processButton) processButton.disabled = true; // Disable process button
-    if (downloadAllCheckbox) downloadAllCheckbox.checked = true; // Reset download all option to checked
+    if (processButton) processButton.disabled = true;
+    if (downloadAllCheckbox) downloadAllCheckbox.checked = true;
 
-    console.log('TextStamp Web application has been reset.'); // Log reset action
+    console.log('CodeStamp Web application has been reset.');
 }
 
 /**
- * Sets up all necessary event listeners for the application's UI elements.
- * Called once the DOM is fully loaded.
+ * Sets up all the initial event listeners for the UI elements.
  */
 function setupEventListeners() {
-    // Event listeners for file input, text input, position buttons
     if (imageInput) imageInput.addEventListener('change', handleImageSelection);
     if (textInput) textInput.addEventListener('input', handleTextChange);
-    if (positionButtons) {
-        positionButtons.forEach(button => button.addEventListener('click', handlePositionSelection));
+    if (positionPlane) {
+        posPlaneCtx = positionPlane.getContext('2d');
+        const rect = positionPlane.getBoundingClientRect();
+        positionPlane.width = rect.width;
+        positionPlane.height = rect.height;
+        positionPlane.addEventListener('click', handlePositionPlaneClick);
+        positionPlane.addEventListener('mousemove', (e) => {
+            const rect = positionPlane.getBoundingClientRect();
+            drawPositionPlane(e.clientX - rect.left, e.clientY - rect.top);
+        });
+        positionPlane.addEventListener('mouseleave', () => {
+            drawPositionPlane();
+        });
+        drawPositionPlane(); // Initial draw
     }
-    // Event listeners for style options
     if (fontSizeInput) fontSizeInput.addEventListener('change', handleFontSizeChange);
     if (textPaddingInput) textPaddingInput.addEventListener('change', handleTextPaddingChange);
     if (barcodeWidthSlider) barcodeWidthSlider.addEventListener('input', handleBarcodeWidthSliderChange);
-    
-    // ADDED: Event listener for barcode value font size input (though it's currently hidden/disabled)
-    // Kept for completeness or if the dedicated input is re-enabled in the future.
-    if (barcodeValueFontSizeInput) barcodeValueFontSizeInput.addEventListener('change', handleBarcodeValueFontSizeChange);
-
-    // Event listeners for barcode checkbox, process button, and reset button
+    if (opacitySlider) opacitySlider.addEventListener('input', handleOpacityChange);
     if (barcodeCheckbox) barcodeCheckbox.addEventListener('change', handleBarcodeCheckboxChange);
     if (processButton) processButton.addEventListener('click', processImages);
     if (resetButton) resetButton.addEventListener('click', resetApp);
-    
+
     // Initial setup calls
-    checkIfReadyToProcess(); // Set initial state of process button
-    if (barcodeCheckbox) { // Call to set initial UI state for barcode related inputs based on checkbox's default state
-        handleBarcodeCheckboxChange({ target: barcodeCheckbox }); // Pass a mock event object
+    checkIfReadyToProcess();
+    if (barcodeCheckbox) {
+        handleBarcodeCheckboxChange({ target: barcodeCheckbox }); // Set initial barcode UI state
     }
-    updatePreview(); // Initial call to setup/hide preview canvas
+    updatePreview();
 }
 
-// Initialize event listeners when the DOM is fully loaded
+// The entry point of the script: sets up event listeners when the DOM is fully loaded.
 document.addEventListener('DOMContentLoaded', setupEventListeners);

@@ -45,7 +45,7 @@
             </div>
         </div>
         
-        <div class="section">
+        <!-- <div class="section">
             <div class="section-title">3. Stamp Position</div>
             <div class="position-grid-container">
                 <button class="position-button icon-btn" data-position="top-left" title="Top Left">↖</button>
@@ -60,6 +60,14 @@
                 <button class="position-button icon-btn" data-position="bottom-center" title="Bottom Center">↓</button>
                 <button class="position-button icon-btn" data-position="bottom-right" title="Bottom Right">↘</button>
             </div>
+            <div id="position-value" style="margin-top: 15px;">Selected Position: None</div>
+        </div> -->
+
+        <div class="section">
+            <div class="section-title">3. Stamp Position</div>
+            
+            <canvas id="position-plane"></canvas>
+
             <div id="position-value" style="margin-top: 15px;">Selected Position: None</div>
         </div>
 
@@ -81,6 +89,13 @@
                 <input type="range" id="barcode-width-slider" min="0" max="100" value="20" style="width: 100%; margin-top: 5px;">
                 <small style="display: block; margin-top: 5px; color: #aaa;">Min 5% will be used. 0% is invalid if barcode is active.</small>
             </div>
+
+            <div class="input-group" id="opacity-slider-group" style="margin-top: 15px;">
+                <label for="opacity-slider">Stamp Opacity: <span id="opacity-value-display">90</span>%</label>
+                <input type="range" id="opacity-slider" min="10" max="100" value="90" style="width: 100%; margin-top: 5px;">
+                <small style="display: block; margin-top: 5px; color: #aaa;">Keep Opacity over 80%, if barcode needs to be scanned later.</small>
+            </div>
+
         </div>
 
         <div class="section">
